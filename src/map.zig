@@ -6,7 +6,7 @@
 //   By: pollivie <pollivie.student.42.fr>          +#+  +:+       +#+        //
 //                                                +#+#+#+#+#+   +#+           //
 //   Created: 2024/07/12 16:17:04 by pollivie          #+#    #+#             //
-//   Updated: 2024/07/12 16:17:05 by pollivie         ###   ########.fr       //
+//   Updated: 2024/07/13 18:10:32 by bvan-pae         ###   ########.fr       //
 //                                                                            //
 // ************************************************************************** //
 
@@ -77,23 +77,6 @@ pub fn Map(comptime T: type) type {
         /// this method returns a pointer to the map but you could also
         /// do it like the next method
         /// HEAP BASED init
-        /// equivalent in C :
-        ///
-        /// t_map *init(t_allocator *allocator) {
-        ///      t_map *self;
-        ///
-        ///      self = (t_map*)malloc(sizeof(t_map));
-        ///     *self = (t_map){
-        ///           .allocator = allocator,
-        ///           .color_data = NULL,
-        ///           .color = NULL,
-        ///           .map_data = NULL,
-        ///           .map = NULL,
-        ///           .width = 0,
-        ///           .height = 0,
-        ///          };
-        ///      return (self);
-        /// }
         pub fn init(allocator: Allocator) Allocator.Error!*Self {
             const new: *Self = try allocator.create(Self);
             new.* = Self{
@@ -108,125 +91,53 @@ pub fn Map(comptime T: type) type {
             return (new);
         }
 
-        /// STACK BASED init
-        /// equivalent in C :
-        ///
-        /// t_map init(t_allocator *allocator) {
-        ///     return (t_map){
-        ///           .allocator = allocator,
-        ///           .color_data = NULL,
-        ///           .color = NULL,
-        ///           .map_data = NULL,
-        ///           .map = NULL,
-        ///           .width = 0,
-        ///           .height = 0,
-        ///          };
-        /// }
-        pub fn init2(allocator: Allocator) Self {
-            return Self{
-                .allocator = allocator,
-                .color_data = ArrayList(Color).init(allocator),
-                .color = ArrayList([]Color).init(allocator),
-                .map_data = ArrayList(Point(T)).init(allocator),
-                .map = ArrayList([]Point(T)).init(allocator),
-                .width = 0,
-                .height = 0,
-            };
-        }
-
         /// This is where the fun begins first as you can see I used Zig's great type system
         /// to bring some expresivness into my function, now my parse function which is meant
         /// to parse the map.fdf buffer, can return descriptive errors indicating exactly what
         /// was wrong with the map
         pub fn parse(self: *Self, raw_points: []const u8) (MapError || Allocator.Error)!void {
-            var height: i32 = 0;
-            var width: i32 = 0;
+            var height: usize = 0;
+            var width: usize = 0;
 
             // here we can leverage the optional type to check that the width are the same
             // in each rows we first put it to null, and on the first check when we see that
             // it's null we will skip checking if (prev_width == width) and give instead
             // to our maybe_prev_width the value of width
-            var maybe_prev_width: ?i32 = null;
+            var max_width: usize = 0;
 
             // let's leverage iterators to parse the map without any memory allocation
             var row_iterator = std.mem.splitScalar(u8, raw_points, '\n');
-            while (row_iterator.next()) |row| : (height += 1) {
+            while (row_iterator.next()) |row| {
                 var entry_iterator = std.mem.splitScalar(u8, row, ' ');
                 width = 0;
-                while (entry_iterator.next()) |entry| : (width += 1) {
-                    var value_iterator = std.mem.splitScalar(u8, entry, ',');
+                if (row.len == 0) continue;
+                height += 1;
+                while (entry_iterator.next()) |entry| {
+                    if (entry.len == 0) continue;
 
-                    // this uses the orelse syntax to express hill_formed_entry which is when the map is not
-                    // formed properly this allow for a second benefit let's break it down :
-                    //
-                    // if you look at the return type of value_iterator.next() you will see that it returns
-                    // value_iterator.next() ?T
-                    //
-                    // this is great but also inconvenient because our raw_z is now optional too :(
-                    //
-                    // but with the orelse syntax we say get me the value or if there is none do X
-                    //
-                    //
-                    //                           ?[]T        (get me the value or return MapError.....)
-                    // const raw_z = value_iterator.next() orelse return MapError.hill_formed_entry;
-                    //
-                    // since we now handle the case whre there is no value_iterator.next returns null;
-                    //
-                    // const raw_z can be a []const u8, instead of a ?[]const u8
-                    //
-                    const raw_z = value_iterator.next() orelse return MapError.hill_formed_entry;
-
-                    // here since we know that there can be no colors we transform the optional into a default value
-
-                    // this is another way to handle errors in our case we take the error from std.fmt.parseInt
-                    // and we replace it with our own error
-                    // this syntax just below is the equivalent of doing
-                    //
-                    // if (my_expression_doesn't produce a null or an error) |capture that good value| {
-                    //    do some stuff with the good value.....
-                    // } else |capture the error| {
-                    //    do something with the error
-                    // }
-                    //
-                    if (std.fmt.parseInt(i32, raw_z, 10)) |z| {
-                        try self.map_data.append(Point(i32).init(width, height, z));
-                    } else |_| {
-                        return MapError.hill_formed_entry;
-                    }
-
-                    if (value_iterator.next()) |color| {
-                        const offset = if (color.len >= 2) 2 else return MapError.hill_formed_entry;
-                        const c = std.fmt.parseInt(u32, color[offset..], 16) catch 0;
-                        // the offset of two is to skip the Ox
-                        try self.color_data.append(Color.init(c));
-                    } else {
-                        try self.color_data.append(Color.init(0));
-                    }
+                    std.debug.print("entry = {s}\n", .{entry});
+                    width += 1;
                 }
-                if (maybe_prev_width) |prev_width| {
-                    if (width != prev_width)
-                        return MapError.hill_formed_map;
-                } else {
-                    maybe_prev_width = width;
-                }
+                std.debug.print("width = {d}\n", .{width});
+                max_width = if (width > max_width) width else max_width;
             }
-            self.height = @intCast(height);
-            self.width = @intCast(width);
+            self.height = height;
+            self.width = max_width;
 
             // here we leverage the type system of zig to effortlessly get [][]Point and [][]Color
             // while also being cache friendly and optimized, because our points and colors are stored
             // linearly in the color_data / point_data Arraylist, and we use the map height/width
             // to take a slice of those (a slice is a fat pointer aka ptr/len ) and now we have a 2d
             // matrix of both points and colors;
-            for (0..self.height) |i| {
-                const begin = i * self.width;
-                const end = self.width + begin;
-                const color_slice = self.color_data.items[begin..end];
-                const point_slice = self.map_data.items[begin..end];
-
-                try self.map.append(point_slice);
-                try self.color.append(color_slice);
-            }
+            // for (0..self.height) |i| {
+            //     const begin = i * self.width;
+            //     const end = self.width + begin;
+            //     const color_slice = self.color_data.items[begin..end];
+            //     const point_slice = self.map_data.items[begin..end];
+            //
+            //     try self.map.append(point_slice);
+            //     try self.color.append(color_slice);
+            // }
         }
 
         pub fn debugColor(self: *Self) void {
@@ -289,4 +200,4 @@ test "test - fillWith" {
     // makes it a really good ergonomic language, because as you
     // go longer and longer in your project having test ensures
     // that your refactoring won't break your code behind your back
- }
+}

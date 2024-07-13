@@ -4,7 +4,7 @@ const backend = @import("backend.zig");
 const MlxRessources = backend.MlxRessources;
 const stderr = std.io.getStdErr().writer();
 
-const map_42 = @embedFile("test_maps/42.fdf");
+const map_42 = @embedFile("test_maps/elem.fdf");
 
 // let's put aside our type into it's own file and import the types
 const map = @import("map.zig");
@@ -99,7 +99,7 @@ fn parseMap(content: []const u8) !void {
     }
 
     // [OK]
-    // Third, parse and populate the map_array 
+    // Third, parse and populate the map_array
     lines_iter = std.mem.splitScalar(u8, content, '\n');
     var row_index: usize = 0;
     while (lines_iter.next()) |line| {
