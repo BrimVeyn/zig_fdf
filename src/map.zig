@@ -6,7 +6,7 @@
 //   By: pollivie <pollivie.student.42.fr>          +#+  +:+       +#+        //
 //                                                +#+#+#+#+#+   +#+           //
 //   Created: 2024/07/12 16:17:04 by pollivie          #+#    #+#             //
-//   Updated: 2024/07/13 18:10:32 by bvan-pae         ###   ########.fr       //
+//   Updated: 2024/07/13 18:12:46 by bvan-pae         ###   ########.fr       //
 //                                                                            //
 // ************************************************************************** //
 
@@ -116,6 +116,8 @@ pub fn Map(comptime T: type) type {
                     if (entry.len == 0) continue;
 
                     std.debug.print("entry = {s}\n", .{entry});
+                    var salope = std.fmt.parseInt(u32, entry, 10) catch 0;
+                    _ = salope; // autofix
                     width += 1;
                 }
                 std.debug.print("width = {d}\n", .{width});
