@@ -13,7 +13,6 @@
 /// Here we put aside everything related to the mlx backend such that we don't
 /// have to see all that ugly code.
 ///
-
 const std = @import("std");
 const libmlx = @cImport({
     @cInclude("stdlib.h");
@@ -41,6 +40,8 @@ extern fn mlx_get_data_addr(
     img_endian: *i32,
 ) [*:0]u8;
 
+extern fn mlx_put_image_to_window(mlx_ptr: ?*anyopaque, win_ptr: ?*anyopaque, img_ptr: ?*anyopaque, x: u32, y: u32) u32;
+
 extern fn mlx_hook(
     win_handle: ?*anyopaque,
     x_event: i32,
@@ -50,8 +51,8 @@ extern fn mlx_hook(
 ) callconv(.C) c_int;
 
 pub const MlxRessources = packed struct {
-    const width: i32 = 800;
-    const height: i32 = 600;
+    const width: i32 = 1000;
+    const height: i32 = 1000;
     const title: [:0]const u8 = "fdf";
     allocator: *std.mem.Allocator,
     mlx: ?*anyopaque,
@@ -74,6 +75,10 @@ pub const MlxRessources = packed struct {
         std.debug.print("init win_ptr = {*}\n", .{result.*.win});
         std.debug.print("init img_ptr = {*}\n", .{result.*.img});
         result.*.data = mlx_get_data_addr(result.*.img, &result.img_bits_per_pixel, &result.*.img_size, &result.*.img_endian);
+        result.*.data[4] = 0xFF;
+        result.*.data[5] = 0xFF;
+        result.*.data[6] = 0xFF;
+        _ = mlx_put_image_to_window(result.*.mlx, result.*.win, result.*.img, 0, 0);
         return (result);
     }
 
