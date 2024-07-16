@@ -4,7 +4,7 @@ const backend = @import("backend.zig");
 const MlxRessources = backend.MlxRessources;
 const stderr = std.io.getStdErr().writer();
 
-const map_42 = @embedFile("test_maps/elem.fdf");
+const map_42 = @embedFile("test_maps/mars.fdf");
 
 // let's put aside our type into it's own file and import the types
 const map = @import("map.zig");
@@ -26,13 +26,13 @@ pub fn main() !void {
     const mlx_res = try MlxRessources.init(&allocator);
 
     std.debug.print("{s}\n", .{map_42});
-    std.debug.print("{}\n", .{@TypeOf(map_42)});
+    // std.debug.print("{}\n", .{@TypeOf(map_42)});
 
-    var it = std.mem.splitScalar(u8, map_42, '\n');
-
-    while (it.next()) |x| {
-        std.debug.print("{s}\n", .{x});
-    }
+    // var it = std.mem.splitScalar(u8, map_42, '\n');
+    //
+    // while (it.next()) |x| {
+    //     std.debug.print("{s}\n", .{x});
+    // }
 
     // here you use the try keyword to say take my error and let it bubble up
     // the callstack, this is ok but you should also consider in which case
@@ -42,11 +42,14 @@ pub fn main() !void {
     defer fdfmap.deinit();
 
     if (fdfmap.parse(map_42)) |_| {
-        fdfmap.rotateZ(45);
-        fdfmap.rotateX(45);
-        fdfmap.scale();
-        // fdfmap.debugPoint();
         fdfmap.debugMapData();
+        fdfmap.rotateZ(fdfmap.theta_z);
+        fdfmap.rotateX(fdfmap.theta_x);
+        fdfmap.scale();
+        fdfmap.draw(mlx_res);
+        mlx_res.pushImgToScreen();
+        // mlx_res.paintScreen(0x0);
+        // fdfmap.debugPoint();
         std.debug.print("heihgt = {d}\n", .{fdfmap.height});
         std.debug.print("width = {d}\n", .{fdfmap.width});
     } else |e| {
@@ -56,6 +59,6 @@ pub fn main() !void {
         }
     }
 
-    mlx_res.loop();
+    mlx_res.loop(fdfmap);
     defer mlx_res.deinit();
 }
