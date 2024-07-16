@@ -31,7 +31,7 @@ const libmlx = @cImport({
     @cInclude("mlx.h");
 });
 
-const Key = enum(u16) {
+const Key = enum(u32) {
     PLUS = 61,
     MINUS = 45,
     WHEEL_DOWN = 5,
@@ -45,12 +45,6 @@ const Key = enum(u16) {
     ARROW_UP = 65362,
     ARROW_RIGHT = 65363,
     ARROW_DOWN = 65364,
-    LEFT = 1,
-    UP = 2,
-    RIGHT = 3,
-    DOWN = 4,
-    X = 0,
-    Y = 1,
     ESCAPE = 65307,
     PLEFT = 91,
     PRIGHT = 93,
@@ -146,6 +140,30 @@ pub const MlxRessources = packed struct {
     pub fn fdfLoop(param: ?*anyopaque) callconv(.C) c_int {
         const maybe_data = @as(?*fdfData, @alignCast(@ptrCast(param)));
         if (maybe_data) |data| {
+            if (data.key_hash.get(@intFromEnum(Key.D_KEY))) |_| {
+                data.map.rotateZ(2);
+                data.mlx_res.paintScreen(0x00);
+                std.debug.print("D PRESSED\n", .{});
+            }
+
+            if (data.key_hash.get(@intFromEnum(Key.A_KEY))) |_| {
+                data.map.rotateZ(-2);
+                data.mlx_res.paintScreen(0x00);
+                std.debug.print("D PRESSED\n", .{});
+            }
+
+            if (data.key_hash.get(@intFromEnum(Key.W_KEY))) |_| {
+                data.map.rotateX(5);
+                data.mlx_res.paintScreen(0x00);
+                std.debug.print("D PRESSED\n", .{});
+            }
+
+            if (data.key_hash.get(@intFromEnum(Key.S_KEY))) |_| {
+                data.map.rotateX(-5);
+                data.mlx_res.paintScreen(0x00);
+                std.debug.print("D PRESSED\n", .{});
+            }
+
             data.map.draw(data.mlx_res);
             data.mlx_res.pushImgToScreen();
         }
@@ -174,7 +192,7 @@ pub const MlxRessources = packed struct {
     pub fn keyHandler(keycode: u32, param: ?*anyopaque) callconv(.C) c_int {
         const maybe_data = @as(?*fdfData, @alignCast(@ptrCast(param)));
         if (maybe_data) |data| {
-            std.debug.print("keycode = {d}\n", .{keycode});
+            // std.debug.print("keycode = {d}\n", .{keycode});
             if (data.key_hash.put(keycode, true)) |_| {} else |e| {
                 switch (e) {
                     error.OutOfMemory => return -1,
@@ -187,7 +205,8 @@ pub const MlxRessources = packed struct {
     pub fn keyReleaseHandler(keycode: u32, param: ?*anyopaque) callconv(.C) c_int {
         const maybe_data = @as(?*fdfData, @alignCast(@ptrCast(param)));
         if (maybe_data) |data| {
-            std.debug.print("kecode = {d} value = {any}\n", .{ keycode, data.key_hash.get(keycode) });
+            _ = data.key_hash.remove(keycode);
+            // std.debug.print("kecode = {d} value = {any}\n", .{ keycode, data.key_hash.get(keycode) });
         }
         return 0;
     }

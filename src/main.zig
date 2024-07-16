@@ -4,7 +4,7 @@ const backend = @import("backend.zig");
 const MlxRessources = backend.MlxRessources;
 const stderr = std.io.getStdErr().writer();
 
-const map_42 = @embedFile("test_maps/mars.fdf");
+const map_42 = @embedFile("test_maps/elem-fract-no-color.fdf");
 
 // let's put aside our type into it's own file and import the types
 const map = @import("map.zig");
@@ -25,7 +25,7 @@ pub fn main() !void {
     var allocator = gpa.allocator();
     const mlx_res = try MlxRessources.init(&allocator);
 
-    std.debug.print("{s}\n", .{map_42});
+    // std.debug.print("{s}\n", .{map_42});
     // std.debug.print("{}\n", .{@TypeOf(map_42)});
 
     // var it = std.mem.splitScalar(u8, map_42, '\n');
@@ -42,7 +42,7 @@ pub fn main() !void {
     defer fdfmap.deinit();
 
     if (fdfmap.parse(map_42)) |_| {
-        fdfmap.debugMapData();
+        // fdfmap.debugMapData();
         fdfmap.rotateZ(fdfmap.theta_z);
         fdfmap.rotateX(fdfmap.theta_x);
         fdfmap.scale();

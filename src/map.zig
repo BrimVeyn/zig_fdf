@@ -205,16 +205,17 @@ pub fn Map(comptime T: type) type {
                 }
                 std.debug.print("\n", .{});
             }
-            self.debugMapData();
+            // self.debugMapData();
         }
 
         pub fn rotateX(self: *Self, Angle: f32) void {
             const thetha = @mod(Angle * math.rad_per_deg, 6.28319);
             const rounded_theta = roundToNearest(thetha, 0.01);
-            const u_rounded_theta = @mod(@as(u32, @intFromFloat(rounded_theta * 100)), 628);
-            // std.debug.print("thetha = {d}\n", .{thetha});
-            // std.debug.print("rounded thetha = {d}\n", .{rounded_theta});
-            // std.debug.print("u_rounded_theta = {d}\n\n", .{u_rounded_theta});
+            const u_rounded_theta = @mod(@as(u32, @intFromFloat(rounded_theta * 100)), 627);
+            std.debug.print("thetha = {d}\n", .{thetha});
+            std.debug.print("rounded thetha = {d}\n", .{rounded_theta});
+            std.debug.print("u_rounded_theta = {d}\n\n", .{u_rounded_theta});
+
             const sin_theta = angle.precomputed_sin[u_rounded_theta];
             const cos_theta = angle.precomputed_cos[u_rounded_theta];
             // std.debug.print("cos_theta = {d}\n", .{cos_theta});
@@ -245,7 +246,10 @@ pub fn Map(comptime T: type) type {
         pub fn rotateZ(self: *Self, Angle: f32) void {
             const thetha = @mod(Angle * math.rad_per_deg, 6.28319);
             const rounded_theta = roundToNearest(thetha, 0.01);
-            const u_rounded_theta = @as(u32, @intFromFloat(rounded_theta * 100));
+            const u_rounded_theta = @mod(@as(u32, @intFromFloat(rounded_theta * 100)), 627);
+            std.debug.print("thetha = {d}\n", .{thetha});
+            std.debug.print("rounded thetha = {d}\n", .{rounded_theta});
+            std.debug.print("u_rounded_theta = {d}\n\n", .{u_rounded_theta});
 
             const sin_theta = angle.precomputed_sin[u_rounded_theta];
             const cos_theta = angle.precomputed_cos[u_rounded_theta];
