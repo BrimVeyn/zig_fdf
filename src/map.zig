@@ -50,12 +50,15 @@ pub const Color = union {
     }
 };
 
+// Really great
 pub const MapError = error{
     wrong_z, //unexcepted Z value
     wrong_color, //Wrong color format
     empty_map, //Empty map lol
+
 };
 
+// the name could be better I think put this is a neat pick
 pub const Vector2 = struct {
     const Self = @This();
     ax: f32,
@@ -87,13 +90,18 @@ pub const Vector2 = struct {
     }
 
     pub fn draw(self: *Self, mlx_res: *MlxRessources) void {
-        var x: i16 = undefined;
-        var y: i16 = undefined;
-        var i: u16 = 0;
+        // I know this is 42's norme trauma but x and y should be declared
+        // inisde the loop the reason is that local variable are easier
+        // for a compiler to optimize
+        // var x: i16 = undefined;
+        // var y: i16 = undefined;
+
+        // here you should replace the while loop with a for loop
+        // the reason is that for loop have better auto vectorization
         const int_dab: u16 = @intFromFloat(self.dab);
-        while (i < int_dab) : (i += 1) {
-            x = @intFromFloat(@round(self.ax + (self.dx * @as(f32, @as(f32, @floatFromInt(i)) / self.dab))));
-            y = @intFromFloat(@round(self.ay + (self.dy * @as(f32, @as(f32, @floatFromInt(i)) / self.dab))));
+        for (0..int_dab) |i| {
+            const x: i16 = @intFromFloat(@round(self.ax + (self.dx * @as(f32, @as(f32, @floatFromInt(i)) / self.dab))));
+            const y: i16 = @intFromFloat(@round(self.ay + (self.dy * @as(f32, @as(f32, @floatFromInt(i)) / self.dab))));
             const color: u32 = 0x0000FF00;
             // std.debug.print("pixel: {d},{d}\n", .{ x, y });
             backend.myMlxPixelPut(mlx_res, x, y, color);

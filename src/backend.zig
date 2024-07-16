@@ -32,6 +32,7 @@ const libmlx = @cImport({
 });
 
 const Key = enum(u32) {
+    None = 0,
     PLUS = 61,
     MINUS = 45,
     WHEEL_DOWN = 5,
@@ -48,6 +49,28 @@ const Key = enum(u32) {
     ESCAPE = 65307,
     PLEFT = 91,
     PRIGHT = 93,
+
+    pub fn toEnum(keycode: u32) Key {
+        return switch (keycode) {
+            61 => .PLUS,
+            45 => .MINUS,
+            5 => .WHEEL_DOWN,
+            119 => .W_KEY,
+            97 => .A_KEY,
+            115 => .S_KEY,
+            100 => .D_KEY,
+            112 => .P_KEY,
+            101 => .E_KEY,
+            65361 => .ARROW_LEFT,
+            65362 => .ARROW_UP,
+            65363 => .ARROW_RIGHT,
+            65364 => .ARROW_DOWN,
+            65307 => .ESCAPE,
+            91 => .PLEFT,
+            93 => .PRIGHT,
+            else => .None,
+        };
+    }
 };
 
 const Map = @import("map.zig").Map;
@@ -73,6 +96,7 @@ extern fn mlx_hook(
 
 extern fn mlx_loop_hook(mlx_ptr: ?*anyopaque, funct_ptr: ?*const fn (?*anyopaque) callconv(.C) c_int, param: ?*anyopaque) callconv(.C) c_int;
 
+// should probably be a member function but it's good anyway
 pub fn myMlxPixelPut(mlx_res: *MlxRessources, x: i16, y: i16, color: u32) void {
     if (x > 1000 or x < 0 or y > 1000 or y < 0) {
         return;
@@ -83,20 +107,6 @@ pub fn myMlxPixelPut(mlx_res: *MlxRessources, x: i16, y: i16, color: u32) void {
         mlx_res.*.data[fx + (fy * MlxRessources.height)] = color;
     }
 }
-
-const fdfData = struct {
-    mlx_res: *MlxRessources,
-    map: *Map(f32),
-    key_hash: std.AutoHashMap(u32, bool),
-
-    pub fn init(allocator: *std.mem.Allocator, mlx_res: *MlxRessources, map: *Map(f32)) !fdfData {
-        return fdfData{
-            .mlx_res = mlx_res,
-            .map = map,
-            .key_hash = std.AutoHashMap(u32, bool).init(allocator.*),
-        };
-    }
-};
 
 pub const MlxRessources = packed struct {
     const Self = @This();
@@ -114,6 +124,25 @@ pub const MlxRessources = packed struct {
     img_bits_per_pixel: i32,
     img_endian: i32,
 
+    // Types in Zig should be PascalCased
+    // since your type isn't use anywhere else
+    // you can "hide" it inside of the type,
+    const FdfData = packed struct {
+        pressed: Key,
+        map: *Map(f32),
+        mlx_res: *MlxRessources,
+
+        // the hashmap feels unecessary, you can simply use the enum directly
+        // go to your loop to see how you could do it
+        pub fn init(mlx_res: *MlxRessources, map: *Map(f32)) FdfData {
+            return FdfData{
+                .mlx_res = mlx_res,
+                .map = map,
+                .pressed = .None,
+            };
+        }
+    };
+
     pub fn init(allocator: *std.mem.Allocator) !*MlxRessources {
         var result = try allocator.create(MlxRessources);
         result.*.allocator = allocator;
@@ -128,57 +157,54 @@ pub const MlxRessources = packed struct {
         return (result);
     }
 
-    pub fn on_program_quit(keycode: u32, arg: ?*anyopaque) callconv(.C) c_int {
-        _ = keycode; // autofix
-        const maybe_mlx_res = @as(?*MlxRessources, @alignCast(@ptrCast(arg)));
-        if (maybe_mlx_res != null) {
-            maybe_mlx_res.?.deinit();
+    pub fn on_program_quit(keycode: u32, maybe_mlx_res: ?*anyopaque) callconv(.C) c_int {
+        _ = keycode;
+        const mlx_res = @as(?*MlxRessources, @alignCast(@ptrCast(maybe_mlx_res)));
+        if (mlx_res) |mlx| {
+            mlx.deinit();
         }
-        return 1;
+        return (1);
     }
 
     pub fn fdfLoop(param: ?*anyopaque) callconv(.C) c_int {
-        const maybe_data = @as(?*fdfData, @alignCast(@ptrCast(param)));
-        if (maybe_data) |data| {
-            if (data.key_hash.get(@intFromEnum(Key.D_KEY))) |_| {
+        var data = @as(*FdfData, @alignCast(@ptrCast(param orelse return (0))));
+        switch (data.pressed) {
+            Key.D_KEY => {
                 data.map.rotateZ(2);
                 data.mlx_res.paintScreen(0x00);
                 std.debug.print("D PRESSED\n", .{});
-            }
-
-            if (data.key_hash.get(@intFromEnum(Key.A_KEY))) |_| {
+            },
+            Key.A_KEY => {
                 data.map.rotateZ(-2);
                 data.mlx_res.paintScreen(0x00);
                 std.debug.print("D PRESSED\n", .{});
-            }
-
-            if (data.key_hash.get(@intFromEnum(Key.W_KEY))) |_| {
+            },
+            Key.W_KEY => {
                 data.map.rotateX(5);
                 data.mlx_res.paintScreen(0x00);
                 std.debug.print("D PRESSED\n", .{});
-            }
-
-            if (data.key_hash.get(@intFromEnum(Key.S_KEY))) |_| {
+            },
+            Key.S_KEY => {
                 data.map.rotateX(-5);
                 data.mlx_res.paintScreen(0x00);
                 std.debug.print("D PRESSED\n", .{});
-            }
-
-            data.map.draw(data.mlx_res);
-            data.mlx_res.pushImgToScreen();
+            },
+            else => {},
         }
+        data.map.draw(data.mlx_res);
+        data.mlx_res.pushImgToScreen();
         return 0;
     }
 
-    pub fn loop(mlx_res: *MlxRessources, map: *Map(f32)) void {
-        var data = try fdfData.init(mlx_res.allocator, mlx_res, map);
-        const data_ptr = @as(?*anyopaque, @ptrCast(&data));
-
-        _ = mlx_hook(mlx_res.win, @as(i32, 17), @as(i32, 1 << 17), on_program_quit, mlx_res);
-        _ = mlx_hook(mlx_res.win, 2, @as(i64, 1 << 0), keyHandler, data_ptr);
-        _ = mlx_hook(mlx_res.win, 3, @as(i64, 1 << 1), keyReleaseHandler, data_ptr);
-        _ = mlx_loop_hook(mlx_res.mlx, fdfLoop, data_ptr);
-        _ = libmlx.mlx_loop(mlx_res.mlx);
+    pub fn loop(mlx_res: *MlxRessources, map: *Map(f32)) !void {
+        var data = FdfData.init(mlx_res, map);
+        const ptr = @as(?*anyopaque, @alignCast(@ptrCast(&data)));
+        const mlx_ptr = @as(?*anyopaque, @alignCast(@ptrCast(mlx_res)));
+        _ = mlx_hook(mlx_res.win, @as(i32, 17), @as(i32, 1 << 17), on_program_quit, mlx_ptr);
+        _ = mlx_hook(mlx_res.win, 2, @as(i64, 1 << 0), keyHandler, ptr);
+        _ = mlx_hook(mlx_res.win, 3, @as(i64, 1 << 1), keyReleaseHandler, ptr);
+        _ = mlx_loop_hook(mlx_res.mlx, fdfLoop, @ptrCast(&data));
+        _ = libmlx.mlx_loop(@alignCast(@ptrCast(mlx_res.*.mlx)));
     }
 
     pub fn paintScreen(self: *Self, color: u32) void {
@@ -189,32 +215,24 @@ pub const MlxRessources = packed struct {
         }
     }
 
-    pub fn keyHandler(keycode: u32, param: ?*anyopaque) callconv(.C) c_int {
-        const maybe_data = @as(?*fdfData, @alignCast(@ptrCast(param)));
-        if (maybe_data) |data| {
-            // std.debug.print("keycode = {d}\n", .{keycode});
-            if (data.key_hash.put(keycode, true)) |_| {} else |e| {
-                switch (e) {
-                    error.OutOfMemory => return -1,
-                }
-            }
-        }
+    pub fn keyHandler(keycode: u32, maybe_data: ?*anyopaque) callconv(.C) c_int {
+        const data = @as(?*FdfData, @alignCast(@ptrCast(maybe_data))) orelse return (0);
+        data.pressed = Key.toEnum(keycode);
         return 0;
     }
 
-    pub fn keyReleaseHandler(keycode: u32, param: ?*anyopaque) callconv(.C) c_int {
-        const maybe_data = @as(?*fdfData, @alignCast(@ptrCast(param)));
-        if (maybe_data) |data| {
-            _ = data.key_hash.remove(keycode);
-            // std.debug.print("kecode = {d} value = {any}\n", .{ keycode, data.key_hash.get(keycode) });
-        }
-        return 0;
+    pub fn keyReleaseHandler(_: u32, maybe_data: ?*anyopaque) callconv(.C) c_int {
+        const data = @as(?*FdfData, @alignCast(@ptrCast(maybe_data))) orelse return (0);
+        data.pressed = .None;
+        return (0);
     }
 
+    // this is good
     pub fn pushImgToScreen(self: *Self) void {
         _ = mlx_put_image_to_window(self.mlx, self.win, self.img, 0, 0);
     }
 
+    // this si good too
     pub fn deinit(mlx_res: *MlxRessources) void {
         const allocator = mlx_res.allocator;
         _ = libmlx.mlx_destroy_image(mlx_res.*.mlx, mlx_res.*.img);

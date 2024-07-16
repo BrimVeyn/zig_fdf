@@ -59,6 +59,6 @@ pub fn main() !void {
         }
     }
 
-    mlx_res.loop(fdfmap);
+    try MlxRessources.loop(mlx_res, fdfmap);
     defer mlx_res.deinit();
 }
