@@ -156,6 +156,8 @@ pub const MlxRessources = packed struct {
     img_size: i32,
     img_bits_per_pixel: i32,
     img_endian: i32,
+    last_time: i128,
+    curr_time: i128,
 
     pub fn init(allocator: *std.mem.Allocator) !*MlxRessources {
         var result = try allocator.create(MlxRessources);
@@ -183,33 +185,51 @@ pub const MlxRessources = packed struct {
         var data = @as(*FdfData, @alignCast(@ptrCast(param orelse return (0))));
         switch (data.pressed) {
             Key.D_KEY => {
-                data.map.rotateZ(2);
-                data.mlx_res.paintScreen(0x00);
-                std.debug.print("D PRESSED\n", .{});
+                data.map.theta_z += 1;
             },
             Key.A_KEY => {
-                data.map.rotateZ(-2);
-                data.mlx_res.paintScreen(0x00);
-                std.debug.print("D PRESSED\n", .{});
+                data.map.theta_z -= 1;
             },
             Key.W_KEY => {
-                data.map.rotateX(5);
-                data.mlx_res.paintScreen(0x00);
-                std.debug.print("D PRESSED\n", .{});
+                data.map.theta_x += 1;
             },
             Key.S_KEY => {
-                data.map.rotateX(-5);
-                data.mlx_res.paintScreen(0x00);
-                std.debug.print("D PRESSED\n", .{});
+                data.map.theta_x -= 1;
+            },
+            Key.ESCAPE => {
+                data.mlx_res.deinit();
             },
             else => {},
         }
+
+        data.mlx_res.curr_time = std.time.nanoTimestamp();
+        const delta_time_ns = data.mlx_res.curr_time - data.mlx_res.last_time;
+        const delta_time_s = @as(f32, @floatFromInt(delta_time_ns)) / 1_000_000_000.0;
+        const fps = 1.0 / delta_time_s;
+
+        // Print FPS
+        std.debug.print("curr fps = {d}\n", .{fps});
+        data.mlx_res.last_time = std.time.nanoTimestamp();
+
+        var fps_str_buf: [64]u8 = undefined;
+        const fps_str = std.fmt.bufPrint(&fps_str_buf, "{d}", .{fps}) catch "N/A";
+        _ = fps_str; // autofix
+
+        const original: []const u8 = "Hello, Zig!";
+        const c_string: [*:0]u8 = @ptrCast(original);
+        wrap_mlx_string_put(data.mlx_res.mlx, data.mlx_res.win, 930, 20, c_string);
+
+        data.map.rotateZ(data.map.theta_z);
+        data.map.rotateX(data.map.theta_x);
+        data.map.scale();
+        data.mlx_res.paintScreen(0x00);
         data.map.draw(data.mlx_res);
         data.mlx_res.pushImgToScreen();
         return 0;
     }
 
     pub fn loop(mlx_res: *MlxRessources, map: *Map(f32)) void {
+        mlx_res.last_time = std.time.nanoTimestamp();
         var data = FdfData.init(mlx_res, map);
         const ptr = @as(?*anyopaque, @alignCast(@ptrCast(&data)));
         const mlx_ptr = @as(?*anyopaque, @alignCast(@ptrCast(mlx_res)));

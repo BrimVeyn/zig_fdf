@@ -20,26 +20,6 @@ const PI = math.pi;
 const backend = @import("backend.zig");
 const MlxRessources = backend.MlxRessources;
 
-// Let's make this a comptime struct such that
-// if you need to change the type of your point
-// you can easily do so,
-pub fn Point(comptime T: type) type {
-    return struct {
-        const Self = @This();
-        x: T,
-        y: T,
-        z: T,
-
-        pub fn init(x: T, y: T, z: T) Self {
-            return Self{
-                .x = x,
-                .y = y,
-                .z = z,
-            };
-        }
-    };
-}
-
 pub const Color = union {
     color: u32,
 
@@ -69,13 +49,13 @@ pub const Vector2 = struct {
     dy: f32,
     dab: f32,
 
-    pub fn init(pa: Point(f32), pb: Point(f32)) Self {
-        const ax = pa.x;
-        const ay = pa.y;
-        const bx = pb.x;
-        const by = pb.y;
-        const dx = pb.x - pa.x;
-        const dy = pb.y - pa.y;
+    pub fn init(pa: @Vector(3, f32), pb: @Vector(3, f32)) Self {
+        const ax = pa[0];
+        const ay = pa[1];
+        const bx = pb[0];
+        const by = pb[1];
+        const dx = pb[0] - pa[0];
+        const dy = pb[1] - pa[1];
         const dab = @sqrt((dx) * (dx) + (dy) * (dy));
 
         return Self{
@@ -90,20 +70,11 @@ pub const Vector2 = struct {
     }
 
     pub fn draw(self: *Self, mlx_res: *MlxRessources) void {
-        // I know this is 42's norme trauma but x and y should be declared
-        // inisde the loop the reason is that local variable are easier
-        // for a compiler to optimize
-        // var x: i16 = undefined;
-        // var y: i16 = undefined;
-
-        // here you should replace the while loop with a for loop
-        // the reason is that for loop have better auto vectorization
         const int_dab: u16 = @intFromFloat(self.dab);
         for (0..int_dab) |i| {
             const x: i16 = @intFromFloat(@round(self.ax + (self.dx * @as(f32, @as(f32, @floatFromInt(i)) / self.dab))));
             const y: i16 = @intFromFloat(@round(self.ay + (self.dy * @as(f32, @as(f32, @floatFromInt(i)) / self.dab))));
             const color: u32 = 0x0000FF00;
-            // std.debug.print("pixel: {d},{d}\n", .{ x, y });
             backend.myMlxPixelPut(mlx_res, x, y, color);
         }
     }
@@ -125,9 +96,12 @@ pub fn Map(comptime T: type) type {
 
         allocator: std.mem.Allocator,
         color_data: ArrayList(Color),
-        map_data: ArrayList(Point(T)),
+        map_data: ArrayList(@Vector(3, f32)),
+        map_save: ArrayList(@Vector(3, f32)),
         theta_z: f32,
         theta_x: f32,
+        theta_y: f32,
+
         z_factor: f32,
         min_x: f32,
         max_x: f32,
@@ -142,11 +116,13 @@ pub fn Map(comptime T: type) type {
             new.* = Self{
                 .allocator = allocator,
                 .color_data = ArrayList(Color).init(allocator),
-                .map_data = ArrayList(Point(T)).init(allocator),
+                .map_data = ArrayList(@Vector(3, f32)).init(allocator),
+                .map_save = ArrayList(@Vector(3, f32)).init(allocator),
                 .width = 0,
                 .height = 0,
                 .theta_z = 45,
                 .theta_x = 45,
+                .theta_y = 0,
                 .z_factor = 1,
                 .min_x = 0,
                 .max_x = 0,
@@ -172,7 +148,7 @@ pub fn Map(comptime T: type) type {
                     const z = std.fmt.parseFloat(T, entry) catch 0;
                     const x: T = @floatFromInt(width);
                     const y: T = @floatFromInt(height);
-                    const entry_point = Point(T).init(x, y, z);
+                    const entry_point = @Vector(3, f32){ x, y, z };
                     try self.map_data.append(entry_point);
 
                     width += 1;
@@ -188,6 +164,7 @@ pub fn Map(comptime T: type) type {
             self.width = max_width;
 
             normalize_pts(self);
+            self.map_save = try self.map_data.clone();
         }
 
         fn normalize_pts(self: *Self) void {
@@ -195,57 +172,48 @@ pub fn Map(comptime T: type) type {
             var mid_y: T = @floatFromInt(self.height);
             mid_x /= 2;
             mid_y /= 2;
-            const is_mid_x_round = @mod(mid_x, 1) == 0.0;
-            const is_mid_y_round = @mod(mid_y, 1) == 0.0;
-            std.debug.print("mid_x = {d}\n", .{mid_x});
-            std.debug.print("mid_y = {d}\n", .{mid_y});
-            std.debug.print("is mid_x round ? {}\n", .{is_mid_x_round});
-            std.debug.print("is mid_y round ? {}\n", .{is_mid_y_round});
 
             const sp_x: T = -mid_x + 0.5;
             const sp_y: T = -mid_y + 0.5;
-            std.debug.print("sp_x {d}, sp_y {d}\n", .{ sp_x, sp_y });
+            // std.debug.print("sp_x {d}, sp_y {d}\n", .{ sp_x, sp_y });
 
             for (0..self.height) |h| {
                 for (0..self.width) |w| {
-                    self.map_data.items[w + h * self.width].x = sp_x + @as(T, @floatFromInt(w));
-                    self.map_data.items[w + h * self.width].y = sp_y + @as(T, @floatFromInt(h));
+                    self.map_data.items[w + h * self.width][0] = sp_x + @as(T, @floatFromInt(w));
+                    self.map_data.items[w + h * self.width][1] = sp_y + @as(T, @floatFromInt(h));
                 }
                 std.debug.print("\n", .{});
             }
-            // self.debugMapData();
         }
 
         pub fn rotateX(self: *Self, Angle: f32) void {
             const thetha = @mod(Angle * math.rad_per_deg, 6.28319);
             const rounded_theta = roundToNearest(thetha, 0.01);
             const u_rounded_theta = @mod(@as(u32, @intFromFloat(rounded_theta * 100)), 627);
-            std.debug.print("thetha = {d}\n", .{thetha});
-            std.debug.print("rounded thetha = {d}\n", .{rounded_theta});
-            std.debug.print("u_rounded_theta = {d}\n\n", .{u_rounded_theta});
 
             const sin_theta = angle.precomputed_sin[u_rounded_theta];
             const cos_theta = angle.precomputed_cos[u_rounded_theta];
-            // std.debug.print("cos_theta = {d}\n", .{cos_theta});
-            // std.debug.print("sin_theta = {d}\n", .{sin_theta});
-            //
-            // std.debug.print("cos, sin = |{d}|{d}|\n", .{ cos_theta, sin_theta });
+
+            self.min_x = 0;
+            self.min_y = 0;
+            self.max_x = 0;
+            self.max_y = 0;
 
             for (0..self.height) |h| {
                 for (0..self.width) |w| {
-                    self.map_data.items[w + h * self.width].y = (self.map_data.items[w + h * self.width].y * cos_theta) - (self.map_data.items[w + h * self.width].z * sin_theta) * self.z_factor;
+                    self.map_data.items[w + h * self.width][1] = (self.map_save.items[w + h * self.width][1] * cos_theta) - (self.map_save.items[w + h * self.width][2] * sin_theta) * self.z_factor;
 
-                    if (self.map_data.items[w + (h * self.width)].x < self.min_x) {
-                        self.min_x = self.map_data.items[w + (h * self.width)].x;
+                    if (self.map_data.items[w + (h * self.width)][0] < self.min_x) {
+                        self.min_x = self.map_data.items[w + (h * self.width)][0];
                     }
-                    if (self.map_data.items[w + (h * self.width)].y < self.min_y) {
-                        self.min_y = self.map_data.items[w + (h * self.width)].y;
+                    if (self.map_data.items[w + (h * self.width)][1] < self.min_y) {
+                        self.min_y = self.map_data.items[w + (h * self.width)][1];
                     }
-                    if (self.map_data.items[w + (h * self.width)].y > self.max_y) {
-                        self.max_y = self.map_data.items[w + (h * self.width)].y;
+                    if (self.map_data.items[w + (h * self.width)][1] > self.max_y) {
+                        self.max_y = self.map_data.items[w + (h * self.width)][1];
                     }
-                    if (self.map_data.items[w + (h * self.width)].x > self.max_x) {
-                        self.max_x = self.map_data.items[w + (h * self.width)].x;
+                    if (self.map_data.items[w + (h * self.width)][0] > self.max_x) {
+                        self.max_x = self.map_data.items[w + (h * self.width)][0];
                     }
                 }
             }
@@ -255,18 +223,15 @@ pub fn Map(comptime T: type) type {
             const thetha = @mod(Angle * math.rad_per_deg, 6.28319);
             const rounded_theta = roundToNearest(thetha, 0.01);
             const u_rounded_theta = @mod(@as(u32, @intFromFloat(rounded_theta * 100)), 627);
-            std.debug.print("thetha = {d}\n", .{thetha});
-            std.debug.print("rounded thetha = {d}\n", .{rounded_theta});
-            std.debug.print("u_rounded_theta = {d}\n\n", .{u_rounded_theta});
 
             const sin_theta = angle.precomputed_sin[u_rounded_theta];
             const cos_theta = angle.precomputed_cos[u_rounded_theta];
 
             for (0..self.height) |h| {
                 for (0..self.width) |w| {
-                    const new_x = (self.map_data.items[w + (h * self.width)].x * cos_theta) - (self.map_data.items[w + (h * self.width)].y * sin_theta);
-                    self.map_data.items[w + (h * self.width)].y = (self.map_data.items[w + (h * self.width)].x * sin_theta) + (self.map_data.items[w + (h * self.width)].y * cos_theta);
-                    self.map_data.items[w + (h * self.width)].x = new_x;
+                    const new_x = (self.map_save.items[w + (h * self.width)][0] * cos_theta) - (self.map_save.items[w + (h * self.width)][1] * sin_theta);
+                    self.map_data.items[w + (h * self.width)][1] = (self.map_save.items[w + (h * self.width)][0] * sin_theta) + (self.map_save.items[w + (h * self.width)][1] * cos_theta);
+                    self.map_data.items[w + (h * self.width)][0] = new_x;
                 }
             }
         }
@@ -280,10 +245,10 @@ pub fn Map(comptime T: type) type {
 
             for (0..self.height) |h| {
                 for (0..self.width) |w| {
-                    self.map_data.items[w + (h * self.width)].x *= s_factor;
-                    self.map_data.items[w + (h * self.width)].y *= s_factor;
-                    self.map_data.items[w + (h * self.width)].x += 1000 / 2.0;
-                    self.map_data.items[w + (h * self.width)].y += 1000 / 2.0 - (yc_off * (s_factor) / 2);
+                    self.map_data.items[w + (h * self.width)][0] *= s_factor;
+                    self.map_data.items[w + (h * self.width)][1] *= s_factor;
+                    self.map_data.items[w + (h * self.width)][0] += 1000 / 2.0;
+                    self.map_data.items[w + (h * self.width)][1] += 1000 / 2.0 - (yc_off * (s_factor) / 2);
                 }
             }
         }
@@ -293,12 +258,10 @@ pub fn Map(comptime T: type) type {
                 for (0..self.width) |w| {
                     if (w < self.width - 1) {
                         var vect_ab = Vector2.init(self.map_data.items[w + (h * self.width)], self.map_data.items[(w + 1) + (h * self.width)]);
-                        // vect_ab.debug();
                         vect_ab.draw(mlx_res);
                     }
                     if (h < self.height - 1) {
                         var vect_ab = Vector2.init(self.map_data.items[w + (h * self.width)], self.map_data.items[w + ((h + 1) * self.width)]);
-                        // vect_ab.debug();
                         vect_ab.draw(mlx_res);
                     }
                 }
@@ -310,7 +273,7 @@ pub fn Map(comptime T: type) type {
             for (0..self.height) |h| {
                 for (0..self.width) |w| {
                     const pts = self.map_data.items[w + h * self.width];
-                    std.debug.print("pts[{d}][{d}] = |{d}|{d}|{d}|\n", .{ w, h, pts.x, pts.y, pts.z });
+                    std.debug.print("pts[{d}][{d}] = |{d}|{d}|{d}|\n", .{ w, h, pts[0], pts[1], pts.z });
                 }
                 std.debug.print("\n", .{});
             }
@@ -318,6 +281,7 @@ pub fn Map(comptime T: type) type {
 
         pub fn deinit(self: *Self) void {
             self.map_data.deinit();
+            self.map_save.deinit();
             self.color_data.deinit();
             self.allocator.destroy(self);
         }

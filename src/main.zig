@@ -25,19 +25,6 @@ pub fn main() !void {
     var allocator = gpa.allocator();
     const mlx_res = try MlxRessources.init(&allocator);
 
-    // std.debug.print("{s}\n", .{map_42});
-    // std.debug.print("{}\n", .{@TypeOf(map_42)});
-
-    // var it = std.mem.splitScalar(u8, map_42, '\n');
-    //
-    // while (it.next()) |x| {
-    //     std.debug.print("{s}\n", .{x});
-    // }
-
-    // here you use the try keyword to say take my error and let it bubble up
-    // the callstack, this is ok but you should also consider in which case
-    // you should handle the errors yourself
-    // var parsed_map = try parseMap(map_42);
     const fdfmap = try Map(f32).init(allocator);
     defer fdfmap.deinit();
 
