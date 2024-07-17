@@ -21,3 +21,8 @@ char	*mlx_get_data_addr(t_img *img,int *bits_per_pixel,
   *endian = img->image->byte_order;
   return (img->data);
 }
+
+char *wrap_mlx_get_data_addr(void *img_ptr, int *bits_per_pixel, int *size_line, int *endian)
+{
+	return mlx_get_data_addr(img_ptr, bits_per_pixel, size_line, endian);
+}

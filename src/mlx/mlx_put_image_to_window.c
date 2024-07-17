@@ -35,3 +35,8 @@ int	mlx_put_image_to_window(t_xvar *xvar,t_win_list *win,t_img *img,
   if (xvar->do_flush)
     XFlush(xvar->display);
 }
+
+int wrap_mlx_put_image_to_window(void *mlx_ptr, void *win_ptr, void *img_ptr, int x, int y)
+{
+	return mlx_put_image_to_window(mlx_ptr, win_ptr, img_ptr, x, y);
+}

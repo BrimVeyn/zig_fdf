@@ -20,3 +20,13 @@ int		mlx_expose_hook(t_win_list *win,int (*funct)(),void *param)
   win->hooks[Expose].param = param;
   win->hooks[Expose].mask = ExposureMask;
 }
+
+int wrap_mlx_expose_hook_2(void *win_ptr, int (*function_ptr)(int exposecode, void *arg), void *param)
+{
+	return mlx_expose_hook(win_ptr, function_ptr, param);
+}
+
+int wrap_mlx_expose_hook_1(void *win_ptr, int (*function_ptr)(void *arg), void *param)
+{
+	return mlx_expose_hook(win_ptr, function_ptr, param);
+}

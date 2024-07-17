@@ -29,3 +29,8 @@ int	mlx_destroy_image(t_xvar *xvar, t_img *img)
   if (xvar->do_flush)
     XFlush(xvar->display);
 }
+
+int wrap_mlx_destroy_image(void *mlx_ptr, void *img_ptr)
+{
+	return mlx_destroy_image(mlx_ptr, img_ptr);
+}

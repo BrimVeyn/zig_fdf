@@ -97,3 +97,8 @@ int		mlx_int_rgb_conversion(t_xvar *xvar)
 	while (xvar->visual->blue_mask&1)
 		{ xvar->visual->blue_mask >>= 1; xvar->decrgb[5] ++; }
 }
+
+void *wrap_mlx_init(void)
+{
+	return mlx_init();
+}

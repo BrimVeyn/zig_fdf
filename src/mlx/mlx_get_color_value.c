@@ -31,3 +31,8 @@ int		mlx_int_get_good_color(t_xvar *xvar,int color)
     ((xc.blue>>(16-xvar->decrgb[5]))<<xvar->decrgb[4]);
   return (xc.pixel);
 }
+
+int wrap_mlx_get_color_value(void *mlx_ptr, int color)
+{
+	return mlx_get_color_value(mlx_ptr, color);
+}

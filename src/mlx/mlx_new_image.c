@@ -157,3 +157,8 @@ void	*mlx_new_image2(t_xvar *xvar,int width, int height)
       return (img);
   return (mlx_int_new_image(xvar,width,height,XYPixmap));
 }
+
+void *wrap_mlx_new_image(void *mlx_ptr, int width, int height)
+{
+  return (mlx_new_image(mlx_ptr, width, height));
+}

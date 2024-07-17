@@ -1,4 +1,4 @@
-const mlx = @cImport({
+pub const mlx = @cImport({
     @cInclude("stdlib.h");
     @cInclude("stdio.h");
     @cInclude("string.h");
@@ -11,6 +11,6 @@ const mlx = @cImport({
     @cInclude("sys/shm.h");
     @cInclude("X11/extensions/XShm.h");
     @cInclude("X11/XKBlib.h");
-    @cInclude("mlx_int.h");
     @cInclude("mlx.h");
+    @cInclude("mlx_int.h");
 });

@@ -20,3 +20,14 @@ int		mlx_mouse_hook(t_win_list *win,int (*funct)(),void *param)
   win->hooks[ButtonPress].param = param;
   win->hooks[ButtonPress].mask = ButtonPressMask;
 }
+
+int wrap_mlx_mouse_hook_2(void *win_ptr, int (*function_ptr)(int keycode, void *arg), void *param)
+{
+	return mlx_mouse_hook(win_ptr, function_ptr, param);
+}
+
+
+int wrap_mlx_mouse_hook_1(void *win_ptr, int (*function_ptr)(void *arg), void *param)
+{
+	return mlx_mouse_hook(win_ptr, function_ptr, param);
+}
