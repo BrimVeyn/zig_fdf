@@ -85,6 +85,8 @@ extern fn mlx_get_data_addr(
 ) [*:0]u32;
 
 extern fn mlx_put_image_to_window(mlx_ptr: ?*anyopaque, win_ptr: ?*anyopaque, img_ptr: ?*anyopaque, x: u32, y: u32) u32;
+extern fn mlx_loop(mlx_ptr : ?*anyopaque) c_int;
+extern fn mlx_loop_end(mlx_ptr : ?*anyopaque) c_int;
 
 extern fn mlx_hook(
     win_handle: ?*anyopaque,
@@ -108,22 +110,6 @@ pub fn myMlxPixelPut(mlx_res: *MlxRessources, x: i16, y: i16, color: u32) void {
     }
 }
 
-pub const MlxRessources = packed struct {
-    const Self = @This();
-    const width: i32 = 1000;
-    const height: i32 = 1000;
-    const title: [:0]const u8 = "fdf";
-    allocator: *std.mem.Allocator,
-    mlx: ?*anyopaque,
-    win: ?*anyopaque,
-    img: ?*anyopaque,
-    data: [*:0]u32,
-    win_width: i32,
-    win_height: i32,
-    img_size: i32,
-    img_bits_per_pixel: i32,
-    img_endian: i32,
-
     // Types in Zig should be PascalCased
     // since your type isn't use anywhere else
     // you can "hide" it inside of the type,
@@ -143,6 +129,23 @@ pub const MlxRessources = packed struct {
         }
     };
 
+pub const MlxRessources = packed struct {
+    const Self = @This();
+    const width: i32 = 1000;
+    const height: i32 = 1000;
+    const title: [:0]const u8 = "fdf";
+    allocator: *std.mem.Allocator,
+    mlx: ?*anyopaque,
+    win: ?*anyopaque,
+    img: ?*anyopaque,
+    data: [*:0]u32,
+    win_width: i32,
+    win_height: i32,
+    img_size: i32,
+    img_bits_per_pixel: i32,
+    img_endian: i32,
+
+
     pub fn init(allocator: *std.mem.Allocator) !*MlxRessources {
         var result = try allocator.create(MlxRessources);
         result.*.allocator = allocator;
@@ -159,10 +162,10 @@ pub const MlxRessources = packed struct {
 
     pub fn on_program_quit(keycode: u32, maybe_mlx_res: ?*anyopaque) callconv(.C) c_int {
         _ = keycode;
-        const mlx_res = @as(?*MlxRessources, @alignCast(@ptrCast(maybe_mlx_res)));
-        if (mlx_res) |mlx| {
-            mlx.deinit();
-        }
+        const mlx_res = maybe_mlx_res;
+        var temp = @as(*MlxRessources, @alignCast(@ptrCast(mlx_res orelse return (0))));
+        _ = mlx_loop_end(temp);
+        temp.deinit();
         return (1);
     }
 
@@ -196,7 +199,7 @@ pub const MlxRessources = packed struct {
         return 0;
     }
 
-    pub fn loop(mlx_res: *MlxRessources, map: *Map(f32)) !void {
+    pub fn loop(mlx_res: *MlxRessources, map: *Map(f32)) void {
         var data = FdfData.init(mlx_res, map);
         const ptr = @as(?*anyopaque, @alignCast(@ptrCast(&data)));
         const mlx_ptr = @as(?*anyopaque, @alignCast(@ptrCast(mlx_res)));
@@ -204,7 +207,7 @@ pub const MlxRessources = packed struct {
         _ = mlx_hook(mlx_res.win, 2, @as(i64, 1 << 0), keyHandler, ptr);
         _ = mlx_hook(mlx_res.win, 3, @as(i64, 1 << 1), keyReleaseHandler, ptr);
         _ = mlx_loop_hook(mlx_res.mlx, fdfLoop, @ptrCast(&data));
-        _ = libmlx.mlx_loop(@alignCast(@ptrCast(mlx_res.*.mlx)));
+        _ = mlx_loop(@alignCast(@ptrCast(mlx_res.*.mlx)));
     }
 
     pub fn paintScreen(self: *Self, color: u32) void {

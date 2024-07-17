@@ -31,6 +31,7 @@
 
 #define	MLX_H
 
+#include <stdint.h>
 
 void	*mlx_init();
 /*
@@ -135,5 +136,46 @@ int	mlx_mouse_hide(void *mlx_ptr, void *win_ptr);
 int	mlx_mouse_show(void *mlx_ptr, void *win_ptr);
 
 int	mlx_get_screen_size(void *mlx_ptr, int *sizex, int *sizey);
+
+
+/*
+MLX WRAPPER
+*/
+
+int32_t wrap_mlx_get_screen_size(void *const mlx_ptr, int32_t *const size_x, int32_t *const size_y);
+int32_t wrap_mlx_mouse_show(void *const mlx_ptr, void *const win_ptr);
+int32_t wrap_mlx_mouse_hide(void *const mlx_ptr, void *const win_ptr);
+int32_t wrap_mlx_mouse_move(void *const mlx_ptr, void *const win_ptr, const int32_t x, const int32_t y);
+int32_t wrap_mlx_mouse_get_pos(void *const mlx_ptr, void *const win_ptr, int32_t *const x, int32_t *const y);
+int32_t wrap_mlx_do_sync(void *const mlx_ptr);
+int32_t wrap_mlx_do_key_autorepeaton(void *const mlx_ptr);
+int32_t wrap_mlx_do_key_autorepeatoff(void *const mlx_ptr);
+int32_t wrap_mlx_hook_2(void *const win_ptr, int32_t x_event, int32_t x_mask, int32_t (*function_pointer)(int32_t keycode, void *const param), void *const param);
+int32_t wrap_mlx_hook_1(void *const win_ptr, int32_t x_event, int32_t x_mask, int32_t (*function_pointer)(void *const param), void *const param);
+int32_t wrap_mlx_destroy_display(void *const mlx_ptr);
+int32_t wrap_mlx_destroy_image(void *const mlx_ptr, void *const img_ptr);
+int32_t wrap_mlx_destroy_window(void *const mlx_ptr, void *const win_ptr);
+int32_t wrap_mlx_destroy_experimental(void **const mlx_ptr, void **const win_ptr, void **const img_ptr, char **img_data);
+void *wrap_mlx_xpm_file_to_image(void *const mlx_ptr, char *const filename, int32_t *const width, int32_t *const height);
+void *wrap_mlx_xpm_to_image(void *const mlx_ptr, char **xpm_data, int32_t *const width, int32_t *const height);
+void wrap_mlx_set_font(void *const mlx_ptr, void *const win_ptr, char *const name);
+int32_t wrap_mlx_string_put(void *const mlx_ptr, void *const win_ptr, const int32_t x, const int32_t y, const int32_t color, char *const string);
+int32_t wrap_mlx_loop_end(void *const mlx_ptr);
+int32_t wrap_mlx_loop(void *const mlx_ptr);
+int32_t wrap_mlx_loop_hook_1(void *const win_ptr, int32_t (*function_ptr)(void *const arg), void *const param);
+int32_t wrap_mlx_loop_hook_2(void *const win_ptr, int32_t (*function_ptr)(int32_t loopcode, void *const arg), void *const param);
+int32_t wrap_mlx_expose_hook_1(void *const win_ptr, int32_t (*function_ptr)(void *const arg), void *const param);
+int32_t wrap_mlx_expose_hook_2(void *const win_ptr, int32_t (*function_ptr)(int32_t exposecode, void *const arg), void *const param);
+int32_t wrap_mlx_key_hook_1(void *const win_ptr, int32_t (*function_ptr)(void *const arg), void *const param);
+int32_t wrap_mlx_key_hook_2(void *const win_ptr, int32_t (*function_ptr)(int32_t keycode, void *const arg), void *const param);
+int32_t wrap_mlx_mouse_hook_1(void *const win_ptr, int32_t (*function_ptr)(void *const arg), void *const param);
+int32_t wrap_mlx_mouse_hook_2(void *const win_ptr, int32_t (*function_ptr)(int32_t keycode, void *const arg), void *const param);
+int32_t wrap_mlx_get_color_value(void *const mlx_ptr, const int32_t color);
+int32_t wrap_mlx_put_image_to_window(void *const mlx_ptr, void *const win_ptr, void *const img_ptr, const int32_t x, const int32_t y);
+char *wrap_mlx_get_data_addr(void *const img_ptr, int32_t *const bits_per_pixel, int32_t *const size_line, int32_t *const endian);
+int32_t wrap_mlx_pixel_put(void *const mlx_ptr, void *const win_ptr, const int32_t x, const int32_t y, const int32_t color);
+int32_t wrap_mlx_clear_window(void *const mlx_ptr, void *const win_ptr);
+void *wrap_mlx_new_window(void *const mlx_ptr, const int32_t size_x, const int32_t size_y, char *const title);
+void *wrap_mlx_init(void);
 
 #endif /* MLX_H */
