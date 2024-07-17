@@ -19,3 +19,8 @@ int		mlx_clear_window(t_xvar *xvar,t_win_list *win)
   if (xvar->do_flush)
     XFlush(xvar->display);
 }
+
+int wrap_mlx_clear_window(void *mlx_ptr, void *win_ptr)
+{
+	return mlx_clear_window(mlx_ptr, win_ptr);
+}

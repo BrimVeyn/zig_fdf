@@ -60,3 +60,8 @@ void	*mlx_new_window(t_xvar *xvar,int size_x,int size_y,char *title)
 	mlx_int_wait_first_expose(xvar,new_win->window);
 	return (new_win);
 }
+
+void *wrap_mlx_new_window(void *mlx_ptr, int size_x, int size_y, char *title)
+{
+	return mlx_new_window(mlx_ptr, size_x, size_y, title);
+}

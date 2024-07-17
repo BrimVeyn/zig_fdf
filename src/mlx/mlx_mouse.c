@@ -46,3 +46,23 @@ int		mlx_mouse_get_pos(t_xvar *xvar, t_win_list *win, \
 		&root_return, &child_return, &root_x_return, &root_y_return, \
 		win_x_return, win_y_return, &mask_return));
 }
+
+int wrap_mlx_mouse_get_pos(void *mlx_ptr, void *win_ptr, int *x, int *y)
+{
+	return mlx_mouse_get_pos(mlx_ptr, win_ptr, x, y);
+}
+
+int wrap_mlx_mouse_move(void *mlx_ptr, void *win_ptr, int x, int y)
+{
+	return mlx_mouse_move(mlx_ptr, win_ptr, x, y);
+}
+
+int wrap_mlx_mouse_hide(void *mlx_ptr, void *win_ptr)
+{
+	return mlx_mouse_hide(mlx_ptr, win_ptr);
+}
+
+int wrap_mlx_mouse_show(void *mlx_ptr, void *win_ptr)
+{
+	return mlx_mouse_show(mlx_ptr, win_ptr);
+}

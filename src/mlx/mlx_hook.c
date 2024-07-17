@@ -38,3 +38,28 @@ int	mlx_do_sync(t_xvar *xvar)
 {
   XSync(xvar->display, False);
 }
+
+int wrap_mlx_hook_1(void *win_ptr, int x_event, int x_mask, int (*function_pointer)(void *param), void *param)
+{
+	return mlx_hook(win_ptr, x_event, x_mask, function_pointer, param);
+}
+
+int wrap_mlx_hook_2(void *win_ptr, int x_event, int x_mask, int (*function_pointer)(int keycode, void *param), void *param)
+{
+	return mlx_hook(win_ptr, x_event, x_mask, function_pointer, param);
+}
+
+int wrap_mlx_do_key_autorepeatoff(void *mlx_ptr)
+{
+	return mlx_do_key_autorepeatoff(mlx_ptr);
+}
+
+int wrap_mlx_do_key_autorepeaton(void *mlx_ptr)
+{
+	return mlx_do_key_autorepeaton(mlx_ptr);
+}
+
+int wrap_mlx_do_sync(void *mlx_ptr)
+{
+	return mlx_do_sync(mlx_ptr);
+}

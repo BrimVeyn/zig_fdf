@@ -28,3 +28,8 @@ void	mlx_set_font(t_xvar *xvar, t_win_list *win, char *name)
 	font = XLoadFont(xvar->display, name);
 	XSetFont(xvar->display, win->gc, font);
 }
+
+void wrap_mlx_set_font(void *mlx_ptr, void *win_ptr, char *name)
+{
+	return mlx_set_font(mlx_ptr, win_ptr, name);
+}

@@ -16,3 +16,8 @@ int	mlx_destroy_display(t_xvar *xvar)
 {
 	XCloseDisplay(xvar->display);
 }
+
+int wrap_mlx_destroy_display(void *mlx_ptr)
+{
+	return mlx_destroy_display(mlx_ptr);
+}

@@ -61,3 +61,13 @@ int			mlx_loop(t_xvar *xvar)
 	}
 	return (0);
 }
+
+int wrap_mlx_loop(void *mlx_ptr)
+{
+	return mlx_loop(mlx_ptr);
+}
+
+int wrap_mlx_loop_end(void *mlx_ptr)
+{
+	return mlx_loop_end(mlx_ptr);
+}

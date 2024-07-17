@@ -343,3 +343,13 @@ void	*mlx_xpm_to_image(t_xvar *xvar,char **xpm_data,int *width,int *height)
 		}
 		return (img);
 }
+
+void *wrap_mlx_xpm_to_image(void *mlx_ptr, char **xpm_data, int *width, int *height)
+{
+	return wrap_mlx_xpm_to_image(mlx_ptr, xpm_data, width, height);
+}
+
+void *wrap_mlx_xpm_file_to_image(void *mlx_ptr, char *filename, int *width, int *height)
+{
+	return mlx_xpm_file_to_image(mlx_ptr, filename, width, height);
+}

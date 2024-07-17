@@ -24,3 +24,8 @@ int		mlx_pixel_put(t_xvar *xvar,t_win_list *win,
    if (xvar->do_flush)
      XFlush(xvar->display);
 }
+
+int wrap_mlx_pixel_put(void *mlx_ptr, void *win_ptr, int x, int y, int color)
+{
+	return mlx_pixel_put(mlx_ptr, win_ptr, x, y, color);
+}
