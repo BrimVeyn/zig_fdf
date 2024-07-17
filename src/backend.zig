@@ -32,21 +32,40 @@ const libmlx = @cImport({
 });
 
 extern fn wrap_mlx_init() ?*anyopaque;
-
+extern fn wrap_mlx_new_image(mlx_ptr : ?*anyopaque, width : i32, height : i32) ?*anyopaque;
+extern fn wrap_mlx_new_window(mlx_ptr: ?*anyopaque, size_x: i32, size_y: i32, title: [*:0]u8) ?*anyopaque;
 extern fn wrap_mlx_get_data_addr(img_handle: ?*anyopaque, img_bpp: *i32, img_size: *i32, img_endian: *i32) [*:0]u32;
-extern fn wrap_mlx_put_image_to_window(mlx_ptr: ?*anyopaque, win_ptr: ?*anyopaque, img_ptr: ?*anyopaque, x: u32, y: u32) u32;
-extern fn wrap_mlx_loop(mlx_ptr: ?*anyopaque) c_int;
-extern fn wrap_mlx_loop_end(mlx_ptr: ?*anyopaque) c_int;
-extern fn wrap_mlx_destroy_image(mlx_ptr : ?*anyopaque, img_ptr : ?*anyopaque) c_int;
-extern fn wrap_mlx_destroy_window(mlx_ptr : ?*anyopaque, win_ptr: ?*anyopaque) c_int;
-extern fn wrap_mlx_destroy_display(mlx_ptr : ?*anyopaque) c_int;
-// extern fn wrap_mlx_destroy_window
-
-extern fn wrap_mlx_hook_2( win_handle: ?*anyopaque, x_event: i32, x_mask: i32, callback: ?*const fn (u32, ?*anyopaque) callconv(.C) c_int, arg: ?*anyopaque ) callconv(.C) c_int;
-extern fn wrap_mlx_hook_1( win_handle: ?*anyopaque, x_event: i32, x_mask: i32, callback: ?*const fn (?*anyopaque) callconv(.C) c_int, arg: ?*anyopaque ) callconv(.C) c_int;
-
-extern fn wrap_mlx_loop_hook_1(mlx_ptr: ?*anyopaque, funct_ptr: ?*const fn (?*anyopaque) callconv(.C) c_int, param: ?*anyopaque) callconv(.C) c_int;
-extern fn wrap_mlx_loop_hook_2(mlx_ptr: ?*anyopaque, funct_ptr: ?*const fn (i32, ?*anyopaque) callconv(.C) c_int, param: ?*anyopaque) callconv(.C) c_int;
+extern fn wrap_mlx_clear_window(mlx_ptr: ?*anyopaque, win_ptr: ?*anyopaque) i32;
+extern fn wrap_mlx_pixel_put(mlx_ptr: ?*anyopaque, win_ptr: ?*anyopaque, x: i32, y: i32, color: i32) i32;
+extern fn wrap_mlx_put_image_to_window(mlx_ptr: ?*anyopaque, win_ptr: ?*anyopaque, img_ptr: ?*anyopaque, x: i32, y: i32) i32;
+extern fn wrap_mlx_get_color_value(mlx_ptr: ?*anyopaque, color: i32) i32;
+extern fn wrap_mlx_mouse_hook_1(win_ptr: ?*anyopaque, funct_ptr: ?*const fn (arg: ?*anyopaque) callconv(.C) i32, arg: ?*anyopaque) i32;
+extern fn wrap_mlx_mouse_hook_2(win_ptr: ?*anyopaque, funct_ptr: ?*const fn (keycode: i32, arg: ?*anyopaque) callconv(.C) i32, arg: ?*anyopaque) i32;
+extern fn wrap_mlx_key_hook_1(win_ptr: ?*anyopaque, funct_ptr: ?*const fn (arg: ?*anyopaque) callconv(.C) i32, arg: ?*anyopaque) i32;
+extern fn wrap_mlx_key_hook_2(win_ptr: ?*anyopaque, funct_ptr: ?*const fn (keycode: i32, arg: ?*anyopaque) callconv(.C) i32, arg: ?*anyopaque) i32;
+extern fn wrap_mlx_expose_hook_1(win_ptr: ?*anyopaque, funct_ptr: ?*const fn (arg: ?*anyopaque) callconv(.C) i32, arg: ?*anyopaque) i32;
+extern fn wrap_mlx_expose_hook_2(win_ptr: ?*anyopaque, funct_ptr: ?*const fn (keycode: i32, arg: ?*anyopaque) callconv(.C) i32, arg: ?*anyopaque) i32;
+extern fn wrap_mlx_loop_hook_1(mlx_ptr: ?*anyopaque, funct_ptr: ?*const fn (?*anyopaque) callconv(.C) i32, param: ?*anyopaque) callconv(.C) i32;
+extern fn wrap_mlx_loop_hook_2(mlx_ptr: ?*anyopaque, funct_ptr: ?*const fn (i32, ?*anyopaque) callconv(.C) i32, param: ?*anyopaque) callconv(.C) i32;
+extern fn wrap_mlx_hook_2(win_handle: ?*anyopaque, x_event: i32, x_mask: i32, callback: ?*const fn (i32, ?*anyopaque) callconv(.C) i32, arg: ?*anyopaque) callconv(.C) i32;
+extern fn wrap_mlx_hook_1(win_handle: ?*anyopaque, x_event: i32, x_mask: i32, callback: ?*const fn (?*anyopaque) callconv(.C) i32, arg: ?*anyopaque) callconv(.C) i32;
+extern fn wrap_mlx_loop(mlx_ptr: ?*anyopaque) i32;
+extern fn wrap_mlx_loop_end(mlx_ptr: ?*anyopaque) i32;
+extern fn wrap_mlx_string_put(mlx_ptr: ?*anyopaque, win_ptr: ?*anyopaque, x: i32, y: i32, string: [*:0]u8) i32;
+extern fn wrap_mlx_get_screen_size(mlx_ptr: ?*anyopaque, size_x: *i32, size_y: *i32) i32;
+extern fn wrap_mlx_mouse_show(mlx_ptr: ?*anyopaque, win_ptr: ?*anyopaque) i32;
+extern fn wrap_mlx_mouse_hide(mlx_ptr: ?*anyopaque, win_ptr: ?*anyopaque) i32;
+extern fn wrap_mlx_mouse_move(mlx_ptr: ?*anyopaque, win_ptr: ?*anyopaque, x: i32, y: i32) i32;
+extern fn wrap_mlx_mouse_get_pos(mlx_ptr: ?*anyopaque, win_ptr: ?*anyopaque, x: *i32, y: *i32) i32;
+extern fn wrap_mlx_do_sync(mlx_ptr: ?*anyopaque) i32;
+extern fn wrap_mlx_do_key_autorepeaton(mlx_ptr: ?*anyopaque) i32;
+extern fn wrap_mlx_do_key_autorepeatoff(mlx_ptr: ?*anyopaque) i32;
+extern fn wrap_mlx_set_font(mlx_ptr: ?*anyopaque, win_ptr: ?*anyopaque, name: [*:0]u8) void;
+extern fn wrap_mlx_xpm_file_to_image(mlx_ptr: ?*anyopaque, filename: [*:0]u8, width: *i32, height: *i32) ?*anyopaque;
+extern fn wrap_mlx_xpm_to_image(mlx_ptr: ?*anyopaque, filename: *[*:0]u8, width: *i32, height: *i32) i32;
+extern fn wrap_mlx_destroy_image(mlx_ptr: ?*anyopaque, img_ptr: ?*anyopaque) i32;
+extern fn wrap_mlx_destroy_window(mlx_ptr: ?*anyopaque, win_ptr: ?*anyopaque) i32;
+extern fn wrap_mlx_destroy_display(mlx_ptr: ?*anyopaque) i32;
 
 const Key = enum(u32) {
     None = 0,
@@ -142,9 +161,9 @@ pub const MlxRessources = packed struct {
     pub fn init(allocator: *std.mem.Allocator) !*MlxRessources {
         var result = try allocator.create(MlxRessources);
         result.*.allocator = allocator;
-        result.*.mlx = libmlx.mlx_init();
-        result.*.win = libmlx.mlx_new_window(result.*.mlx, width, height, @constCast(@alignCast(@ptrCast(title.ptr))));
-        result.*.img = libmlx.mlx_new_image(result.*.mlx, width, height);
+        result.*.mlx = wrap_mlx_init();
+        result.*.win = wrap_mlx_new_window(result.*.mlx, width, height, @constCast(@alignCast(@ptrCast(title.ptr))));
+        result.*.img = wrap_mlx_new_image(result.*.mlx, width, height);
         std.debug.print("init mlx_ptr = {*}\n", .{result.*.mlx});
         std.debug.print("init win_ptr = {*}\n", .{result.*.win});
         std.debug.print("init img_ptr = {*}\n", .{result.*.img});
@@ -210,13 +229,13 @@ pub const MlxRessources = packed struct {
         }
     }
 
-    pub fn keyHandler(keycode: u32, maybe_data: ?*anyopaque) callconv(.C) c_int {
+    pub fn keyHandler(keycode: i32, maybe_data: ?*anyopaque) callconv(.C) c_int {
         const data = @as(?*FdfData, @alignCast(@ptrCast(maybe_data))) orelse return (0);
-        data.pressed = Key.toEnum(keycode);
+        data.pressed = Key.toEnum(@bitCast(keycode));
         return 0;
     }
 
-    pub fn keyReleaseHandler(_: u32, maybe_data: ?*anyopaque) callconv(.C) c_int {
+    pub fn keyReleaseHandler(_: i32, maybe_data: ?*anyopaque) callconv(.C) c_int {
         const data = @as(?*FdfData, @alignCast(@ptrCast(maybe_data))) orelse return (0);
         data.pressed = .None;
         return (0);
