@@ -6,7 +6,7 @@
 //   By: pollivie <pollivie.student.42.fr>          +#+  +:+       +#+        //
 //                                                +#+#+#+#+#+   +#+           //
 //   Created: 2024/07/12 16:17:15 by pollivie          #+#    #+#             //
-//   Updated: 2024/07/18 11:11:32 by bvan-pae         ###   ########.fr       //
+//   Updated: 2024/07/18 12:14:17 by bvan-pae         ###   ########.fr       //
 //                                                                            //
 // ************************************************************************** //
 
@@ -62,8 +62,9 @@ extern fn wrap_mlx_new_image(mlx_ptr: ?*anyopaque, width: i32, height: i32) ?*an
 extern fn wrap_mlx_new_window(mlx_ptr: ?*anyopaque, size_x: i32, size_y: i32, title: [*:0]u8) ?*anyopaque;
 extern fn wrap_mlx_pixel_put(mlx_ptr: ?*anyopaque, win_ptr: ?*anyopaque, x: i32, y: i32, color: i32) i32;
 extern fn wrap_mlx_put_image_to_window(mlx_ptr: ?*anyopaque, win_ptr: ?*anyopaque, img_ptr: ?*anyopaque, x: i32, y: i32) i32;
-extern fn wrap_mlx_set_font(mlx_ptr: ?*anyopaque, win_ptr: ?*anyopaque, name: [*:0]u8) void;
-extern fn wrap_mlx_string_put(mlx_ptr: ?*anyopaque, win_ptr: ?*anyopaque, x: i32, y: i32, string: [*:0]u8) i32;
+extern fn wrap_mlx_set_font(mlx_ptr: ?*anyopaque, win_ptr: ?*anyopaque, name: [*:0]const u8) void;
+
+extern fn wrap_mlx_string_put(mlx_ptr: ?*anyopaque, win_ptr: ?*anyopaque, x: i32, y: i32, color: u32, string: [*:0]u8) i32;
 extern fn wrap_mlx_xpm_file_to_image(mlx_ptr: ?*anyopaque, filename: [*:0]u8, width: *i32, height: *i32) ?*anyopaque;
 extern fn wrap_mlx_xpm_to_image(mlx_ptr: ?*anyopaque, filename: *[*:0]u8, width: *i32, height: *i32) i32;
 
@@ -369,7 +370,7 @@ pub const MlxBackend = struct {
     pub fn stringPut(self: *MlxBackend, string: [*:0]u8, x: i32, y: i32) bool {
         if (self.*.mlx_ptr) |_| {
             if (self.*.win_ptr) |_| {
-                _ = wrap_mlx_string_put(self.*.mlx_ptr, self.*.win_ptr, x, y, string[0..]);
+                _ = wrap_mlx_string_put(self.*.mlx_ptr, self.*.win_ptr, x, y, 0xFFFFFF00, string[0..]);
                 return (true);
             }
         }
@@ -532,27 +533,29 @@ pub const MlxRessources = packed struct {
             else => {},
         }
 
-        // data.mlx_res.curr_time = std.time.nanoTimestamp();
-        // const delta_time_ns = data.mlx_res.curr_time - data.mlx_res.last_time;
-        // const delta_time_s = @as(f32, @floatFromInt(delta_time_ns)) / 1_000_000_000.0;
-        // const fps = 1.0 / delta_time_s;
-        //
-        // // Print FPS
+        data.mlx_res.curr_time = std.time.nanoTimestamp();
+        const delta_time_ns = data.mlx_res.curr_time - data.mlx_res.last_time;
+        const delta_time_s = @as(f32, @floatFromInt(delta_time_ns)) / 1_000_000_000.0;
+        const fps = @round(1.0 / delta_time_s);
+
+        // Print FPS
         // std.debug.print("curr fps = {d}\n", .{fps});
-        // data.mlx_res.last_time = std.time.nanoTimestamp();
-        //
-        // var fps_str_buf: [64]u8 = undefined;
+        data.mlx_res.last_time = std.time.nanoTimestamp();
+
         // const fps_str = std.fmt.bufPrint(&fps_str_buf, "{d}", .{fps}) catch "N/A";
-        // _ = fps_str; // autofix
-        //
-        // const original: []const u8 = "Hello, Zig!";
-        // const c_string: [*:0]u8 = @ptrCast(original);
-        // wrap_mlx_string_put(data.mlx_res.mlx, data.mlx_res.win, 930, 20, c_string);
 
         data.map.render();
         data.mlx_res.paintScreen(0x00);
         data.map.draw(data.mlx_res);
         data.mlx_res.pushImgToScreen();
+        var fps_str_buf: [64:0]u8 = undefined;
+        if (std.fmt.bufPrintZ(&fps_str_buf, "FPS: {d}", .{fps})) |result| {
+            const fps_str: [*:0]u8 = result[0.. :0].ptr;
+            var font_str = "8x16";
+            const c_font_str: [*:0]const u8 = font_str[0.. :0].ptr;
+            _ = wrap_mlx_set_font(data.mlx_res.mlx, data.mlx_res.win, c_font_str);
+            _ = wrap_mlx_string_put(data.mlx_res.mlx, data.mlx_res.win, 930, 20, 0xFFFFFF, fps_str);
+        } else |_| {}
         return 0;
     }
 
