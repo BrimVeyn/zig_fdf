@@ -6,7 +6,7 @@
 //   By: pollivie <pollivie.student.42.fr>          +#+  +:+       +#+        //
 //                                                +#+#+#+#+#+   +#+           //
 //   Created: 2024/07/12 16:17:15 by pollivie          #+#    #+#             //
-//   Updated: 2024/07/18 12:14:17 by bvan-pae         ###   ########.fr       //
+//   Updated: 2024/07/18 20:48:14 by bvan-pae         ###   ########.fr       //
 //                                                                            //
 // ************************************************************************** //
 
@@ -99,6 +99,7 @@ const Key = enum(u32) {
             100 => .D_KEY,
             112 => .P_KEY,
             101 => .E_KEY,
+
             65361 => .ARROW_LEFT,
             65362 => .ARROW_UP,
             65363 => .ARROW_RIGHT,
@@ -112,6 +113,7 @@ const Key = enum(u32) {
 };
 
 const Map = @import("map.zig").Map;
+const ColorMode = @import("map.zig").ColorMode;
 
 // should probably be a member function but it's good anyway
 pub fn myMlxPixelPut(mlx_res: *MlxRessources, x: i16, y: i16, color: u32) void {
@@ -198,6 +200,9 @@ pub const MlxRessources = packed struct {
             },
             Key.E_KEY => {
                 data.map.theta_y += 1;
+            },
+            Key.P_KEY => {
+                ColorMode.switch_mode();
             },
             Key.ESCAPE => {
                 data.mlx_res.deinit();

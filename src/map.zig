@@ -20,17 +20,6 @@ const PI = math.pi;
 const backend = @import("backend.zig");
 const MlxRessources = backend.MlxRessources;
 
-pub const Color = union {
-    color: u32,
-
-    pub fn init(value: u32) Color {
-        return Color{
-            .color = value,
-        };
-    }
-};
-
-// Really great
 pub const MapError = error{
     wrong_z, //unexcepted Z value
     wrong_color, //Wrong color format
@@ -64,19 +53,59 @@ pub const RotateParams = struct {
     }
 };
 
+pub const ColorMode = enum(u32) {
+    var mode: u16 = 0;
+    RGB,
+    BRG,
+
+    pub fn switch_mode() void {
+        mode = @mod(mode + 1, 2);
+    }
+};
+
+pub const Color = struct {
+    const Self = @This();
+    r: u8,
+    g: u8,
+    b: u8,
+    a: u8,
+
+    pub fn init(int_color: u32) Self {
+        return Self{
+            .r = @intCast((int_color >> 16) & 0xFF),
+            .g = @intCast((int_color >> 8) & 0xFF),
+            .b = @intCast(int_color & 0xFF),
+            .a = @intCast(int_color & 0xFF),
+        };
+    }
+
+    fn toInt(self: *Self, mode: ColorMode) u32 {
+        switch (mode) {
+            ColorMode.RGB => return (@as(u32, self.a) << 24) |
+                (@as(u32, self.r) << 16) |
+                (@as(u32, self.g) << 8) |
+                @as(u32, self.b),
+            ColorMode.BRG => return (@as(u32, self.a) << 24) |
+                (@as(u32, self.b) << 16) |
+                (@as(u32, self.r) << 8) |
+                @as(u32, self.g),
+        }
+    }
+};
+
 pub const Point = struct {
     const Self = @This();
     x: f32,
     y: f32,
     z: f32,
-    color: ?u32,
+    color: Color,
 
-    pub fn init(a: f32, b: f32, c: f32, d: ?u32) Self {
+    pub fn init(a: f32, b: f32, c: f32, d: u32) Self {
         return Self{
             .x = a,
             .y = b,
             .z = c,
-            .color = d,
+            .color = Color.init(d),
         };
     }
 
@@ -139,13 +168,39 @@ pub const Vector2 = struct {
         };
     }
 
-    pub fn draw(self: *Self, mlx_res: *MlxRessources) void {
+    pub fn getGradient(color_a: Color, color_b: Color, x: f32, color_mode: ColorMode) u32 {
+        const diff_r: u8 = @intCast(@abs(@as(i16, color_a.r) - @as(i16, color_b.r)));
+        const rounded_r: u8 = @intFromFloat(@round(@as(f32, @floatFromInt(diff_r)) * x));
+        const diff_g: u8 = @intCast(@abs(@as(i16, color_a.g) - @as(i16, color_b.g)));
+        const rounded_g: u8 = @intFromFloat(@round(@as(f32, @floatFromInt(diff_g)) * x));
+        const diff_b: u8 = @intCast(@abs(@as(i16, color_a.b) - @as(i16, color_b.b)));
+        const rounded_b: u8 = @intFromFloat(@round(@as(f32, @floatFromInt(diff_b)) * x));
+        const tmp_r = if (color_a.r < color_b.r) color_a.r + rounded_r else color_a.r - rounded_r;
+        const tmp_g = if (color_a.g < color_b.g) color_a.g + rounded_g else color_a.g - rounded_g;
+        const tmp_b = if (color_a.b < color_b.b) color_a.b + rounded_b else color_a.r - rounded_b;
+        var GradColor = Color{
+            .a = 0,
+            .r = tmp_r,
+            .g = tmp_g,
+            .b = tmp_b,
+        };
+
+        return GradColor.toInt(color_mode);
+    }
+
+    pub fn draw(self: *Self, mlx_res: *MlxRessources, color_a: Color, color_b: Color, color_mode: ColorMode) void {
         const int_dab: u16 = @intFromFloat(self.dab);
         for (0..int_dab) |i| {
             const x: i16 = @intFromFloat(@round(self.ax + (self.dx * @as(f32, @as(f32, @floatFromInt(i)) / self.dab))));
             const y: i16 = @intFromFloat(@round(self.ay + (self.dy * @as(f32, @as(f32, @floatFromInt(i)) / self.dab))));
-            const color: u32 = 0x0000FF00;
+            // const color = 0x0000FF00;
+            // if (color_a.toInt(color_mode) == color_a.toInt(color_mode)) {
+            //     const color = color_a.toInt(color_mode);
+            //     backend.myMlxPixelPut(mlx_res, x, y, color);
+            // } else {
+            const color = getGradient(color_a, color_b, @as(f32, @as(f32, @floatFromInt(i)) / self.dab), color_mode);
             backend.myMlxPixelPut(mlx_res, x, y, color);
+            // }
         }
     }
 
@@ -161,7 +216,6 @@ fn roundToNearest(x: f32, nearest: f32) f32 {
 /// here we make the map comptime again such that it can create an ArrayList of Points(T)
 pub fn Map(comptime T: type) type {
     return struct {
-        const DefaultColor = "0x00000000";
         const Self = @This();
 
         allocator: std.mem.Allocator,
@@ -181,6 +235,8 @@ pub fn Map(comptime T: type) type {
         width: usize,
         height: usize,
 
+        color_mode: ColorMode,
+
         pub fn init(allocator: Allocator) Allocator.Error!*Self {
             const new: *Self = try allocator.create(Self);
             new.* = Self{
@@ -198,6 +254,7 @@ pub fn Map(comptime T: type) type {
                 .max_x = 0,
                 .min_y = 0,
                 .max_y = 0,
+                .color_mode = ColorMode.RGB,
             };
             return (new);
         }
@@ -214,11 +271,28 @@ pub fn Map(comptime T: type) type {
                 if (row.len == 0) continue;
                 while (entry_iterator.next()) |entry| {
                     if (entry.len == 0) continue;
-                    // std.debug.print("entry = {s}\n", .{entry});
-                    const z = std.fmt.parseFloat(T, entry) catch 0;
+
+                    var color: u32 = undefined;
+                    var color_entry = std.mem.splitScalar(u8, entry, ',');
+                    var z: f32 = undefined;
+
+                    if (color_entry.next()) |value| {
+                        z = std.fmt.parseFloat(f32, value) catch 0;
+                        if (std.mem.eql(u8, value, entry)) {
+                            color = 0x00FFFFFF;
+                        } else {
+                            if (color_entry.next()) |col| {
+                                const col_no_prefix = col[2..];
+                                color = std.fmt.parseInt(u32, col_no_prefix, 16) catch 0;
+                            }
+                        }
+                    }
+
                     const x: T = @floatFromInt(width);
                     const y: T = @floatFromInt(height);
-                    const entry_point = Point.init(x, y, z, null);
+
+                    const entry_point = Point.init(x, y, z, color);
+
                     try self.map_data.append(entry_point);
 
                     width += 1;
@@ -252,7 +326,7 @@ pub fn Map(comptime T: type) type {
                     self.map_data.items[w + h * self.width].x = sp_x + @as(T, @floatFromInt(w));
                     self.map_data.items[w + h * self.width].y = sp_y + @as(T, @floatFromInt(h));
                 }
-                std.debug.print("\n", .{});
+                // std.debug.print("\n", .{});
             }
         }
 
@@ -314,11 +388,11 @@ pub fn Map(comptime T: type) type {
                 for (0..self.width) |w| {
                     if (w < self.width - 1) {
                         var vect_ab = Vector2.init(self.map_data.items[w + (h * self.width)], self.map_data.items[(w + 1) + (h * self.width)]);
-                        vect_ab.draw(mlx_res);
+                        vect_ab.draw(mlx_res, self.map_data.items[w + (h * self.width)].color, self.map_data.items[(w + 1) + (h * self.width)].color, self.color_mode);
                     }
                     if (h < self.height - 1) {
                         var vect_ab = Vector2.init(self.map_data.items[w + (h * self.width)], self.map_data.items[w + ((h + 1) * self.width)]);
-                        vect_ab.draw(mlx_res);
+                        vect_ab.draw(mlx_res, self.map_data.items[w + (h * self.width)].color, self.map_data.items[(w + ((h + 1) * self.width))].color, self.color_mode);
                     }
                 }
             }
@@ -329,7 +403,7 @@ pub fn Map(comptime T: type) type {
             for (0..self.height) |h| {
                 for (0..self.width) |w| {
                     const pts = self.map_data.items[w + h * self.width];
-                    std.debug.print("pts[{d}][{d}] = |{d}|{d}|{d}|\n", .{ w, h, pts[0], pts[1], pts.z });
+                    std.debug.print("pts[{d}][{d}] = |{d}|{d}|{d}|{?d}|\n", .{ w, h, pts.x, pts.y, pts.z, pts.color });
                 }
                 std.debug.print("\n", .{});
             }

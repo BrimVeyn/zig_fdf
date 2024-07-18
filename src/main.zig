@@ -4,7 +4,7 @@ const backend = @import("backend.zig");
 const MlxRessources = backend.MlxRessources;
 const stderr = std.io.getStdErr().writer();
 
-const map_42 = @embedFile("test_maps/elem-fract-no-color.fdf");
+const map_42 = @embedFile("test_maps/elem-fract.fdf");
 
 // let's put aside our type into it's own file and import the types
 const map = @import("map.zig");
