@@ -30,9 +30,7 @@ pub fn main() !void {
 
     if (fdfmap.parse(map_42)) |_| {
         // fdfmap.debugMapData();
-        fdfmap.rotateZ(fdfmap.theta_z);
-        fdfmap.rotateX(fdfmap.theta_x);
-        fdfmap.scale();
+        fdfmap.render();
         fdfmap.draw(mlx_res);
         mlx_res.pushImgToScreen();
         // mlx_res.paintScreen(0x0);

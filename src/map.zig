@@ -35,7 +35,77 @@ pub const MapError = error{
     wrong_z, //unexcepted Z value
     wrong_color, //Wrong color format
     empty_map, //Empty map lol
+};
 
+pub const RotateParams = struct {
+    cos_thetaX: f32,
+    sin_thetaX: f32,
+    cos_thetaY: f32,
+    sin_thetaY: f32,
+    cos_thetaZ: f32,
+    sin_thetaZ: f32,
+
+    pub fn init(deg_angle_x: f32, deg_angle_y: f32, deg_angle_z: f32) RotateParams {
+        const theta_x = roundToNearest(@mod(deg_angle_x * math.rad_per_deg, 6.28319), 0.01);
+        const rounded_theta_x = @mod(@as(u32, @intFromFloat(theta_x * 100)), 627);
+        const theta_y = roundToNearest(@mod(deg_angle_y * math.rad_per_deg, 6.28319), 0.01);
+        const rounded_theta_y = @mod(@as(u32, @intFromFloat(theta_y * 100)), 627);
+        const theta_z = roundToNearest(@mod(deg_angle_z * math.rad_per_deg, 6.28319), 0.01);
+        const rounded_theta_z = @mod(@as(u32, @intFromFloat(theta_z * 100)), 627);
+
+        return RotateParams{
+            .cos_thetaX = angle.precomputed_cos[rounded_theta_x],
+            .sin_thetaX = angle.precomputed_sin[rounded_theta_x],
+            .cos_thetaY = angle.precomputed_cos[rounded_theta_y],
+            .sin_thetaY = angle.precomputed_sin[rounded_theta_y],
+            .cos_thetaZ = angle.precomputed_cos[rounded_theta_z],
+            .sin_thetaZ = angle.precomputed_sin[rounded_theta_z],
+        };
+    }
+};
+
+pub const Point = struct {
+    const Self = @This();
+    x: f32,
+    y: f32,
+    z: f32,
+    color: ?u32,
+
+    pub fn init(a: f32, b: f32, c: f32, d: ?u32) Self {
+        return Self{
+            .x = a,
+            .y = b,
+            .z = c,
+            .color = d,
+        };
+    }
+
+    pub fn rotateX(cos_theta: f32, sin_theta: f32, v0: Point) Self {
+        return Self{
+            .x = v0.x,
+            .y = (v0.y * cos_theta) - (v0.z * sin_theta),
+            .z = (v0.y * sin_theta) + (v0.z * cos_theta),
+            .color = v0.color,
+        };
+    }
+
+    pub fn rotateY(cos_theta: f32, sin_theta: f32, v0: Point) Self {
+        return Self{
+            .x = (v0.x * cos_theta) + (v0.z * sin_theta),
+            .y = v0.y,
+            .z = -(v0.x * sin_theta) + (v0.z * cos_theta),
+            .color = v0.color,
+        };
+    }
+
+    pub fn rotateZ(cos_theta: f32, sin_theta: f32, v0: Point) Self {
+        return Self{
+            .x = (v0.x * cos_theta) - (v0.y * sin_theta),
+            .y = (v0.x * sin_theta) + (v0.y * cos_theta),
+            .z = v0.z,
+            .color = v0.color,
+        };
+    }
 };
 
 // the name could be better I think put this is a neat pick
@@ -49,13 +119,13 @@ pub const Vector2 = struct {
     dy: f32,
     dab: f32,
 
-    pub fn init(pa: @Vector(3, f32), pb: @Vector(3, f32)) Self {
-        const ax = pa[0];
-        const ay = pa[1];
-        const bx = pb[0];
-        const by = pb[1];
-        const dx = pb[0] - pa[0];
-        const dy = pb[1] - pa[1];
+    pub fn init(pa: Point, pb: Point) Self {
+        const ax = pa.x;
+        const ay = pa.y;
+        const bx = pb.x;
+        const by = pb.y;
+        const dx = pb.x - pa.x;
+        const dy = pb.y - pa.y;
         const dab = @sqrt((dx) * (dx) + (dy) * (dy));
 
         return Self{
@@ -96,8 +166,8 @@ pub fn Map(comptime T: type) type {
 
         allocator: std.mem.Allocator,
         color_data: ArrayList(Color),
-        map_data: ArrayList(@Vector(3, f32)),
-        map_save: ArrayList(@Vector(3, f32)),
+        map_data: ArrayList(Point),
+        map_save: ArrayList(Point),
         theta_z: f32,
         theta_x: f32,
         theta_y: f32,
@@ -116,8 +186,8 @@ pub fn Map(comptime T: type) type {
             new.* = Self{
                 .allocator = allocator,
                 .color_data = ArrayList(Color).init(allocator),
-                .map_data = ArrayList(@Vector(3, f32)).init(allocator),
-                .map_save = ArrayList(@Vector(3, f32)).init(allocator),
+                .map_data = ArrayList(Point).init(allocator),
+                .map_save = ArrayList(Point).init(allocator),
                 .width = 0,
                 .height = 0,
                 .theta_z = 45,
@@ -148,7 +218,7 @@ pub fn Map(comptime T: type) type {
                     const z = std.fmt.parseFloat(T, entry) catch 0;
                     const x: T = @floatFromInt(width);
                     const y: T = @floatFromInt(height);
-                    const entry_point = @Vector(3, f32){ x, y, z };
+                    const entry_point = Point.init(x, y, z, null);
                     try self.map_data.append(entry_point);
 
                     width += 1;
@@ -163,11 +233,11 @@ pub fn Map(comptime T: type) type {
             self.height = height;
             self.width = max_width;
 
-            normalize_pts(self);
+            world_center(self);
             self.map_save = try self.map_data.clone();
         }
 
-        fn normalize_pts(self: *Self) void {
+        fn world_center(self: *Self) void {
             var mid_x: T = @floatFromInt(self.width);
             var mid_y: T = @floatFromInt(self.height);
             mid_x /= 2;
@@ -179,61 +249,47 @@ pub fn Map(comptime T: type) type {
 
             for (0..self.height) |h| {
                 for (0..self.width) |w| {
-                    self.map_data.items[w + h * self.width][0] = sp_x + @as(T, @floatFromInt(w));
-                    self.map_data.items[w + h * self.width][1] = sp_y + @as(T, @floatFromInt(h));
+                    self.map_data.items[w + h * self.width].x = sp_x + @as(T, @floatFromInt(w));
+                    self.map_data.items[w + h * self.width].y = sp_y + @as(T, @floatFromInt(h));
                 }
                 std.debug.print("\n", .{});
             }
         }
 
-        pub fn rotateX(self: *Self, Angle: f32) void {
-            const thetha = @mod(Angle * math.rad_per_deg, 6.28319);
-            const rounded_theta = roundToNearest(thetha, 0.01);
-            const u_rounded_theta = @mod(@as(u32, @intFromFloat(rounded_theta * 100)), 627);
+        pub fn rotateXYZ(p: RotateParams, v0: Point) Point {
+            var result = Point.rotateX(p.cos_thetaX, p.sin_thetaX, v0);
+            result = Point.rotateY(p.cos_thetaY, p.sin_thetaY, result);
+            result = Point.rotateZ(p.cos_thetaZ, p.sin_thetaZ, result);
+            return result;
+        }
 
-            const sin_theta = angle.precomputed_sin[u_rounded_theta];
-            const cos_theta = angle.precomputed_cos[u_rounded_theta];
-
+        pub fn render(self: *Self) void {
             self.min_x = 0;
             self.min_y = 0;
             self.max_x = 0;
             self.max_y = 0;
 
+            const rotation_params = RotateParams.init(self.theta_x, self.theta_y, self.theta_z);
             for (0..self.height) |h| {
                 for (0..self.width) |w| {
-                    self.map_data.items[w + h * self.width][1] = (self.map_save.items[w + h * self.width][1] * cos_theta) - (self.map_save.items[w + h * self.width][2] * sin_theta) * self.z_factor;
+                    self.map_data.items[w + (h * self.width)] = rotateXYZ(rotation_params, self.map_save.items[w + (h * self.width)]);
 
-                    if (self.map_data.items[w + (h * self.width)][0] < self.min_x) {
-                        self.min_x = self.map_data.items[w + (h * self.width)][0];
+                    if (self.map_data.items[w + (h * self.width)].x < self.min_x) {
+                        self.min_x = self.map_data.items[w + (h * self.width)].x;
                     }
-                    if (self.map_data.items[w + (h * self.width)][1] < self.min_y) {
-                        self.min_y = self.map_data.items[w + (h * self.width)][1];
+                    if (self.map_data.items[w + (h * self.width)].y < self.min_y) {
+                        self.min_y = self.map_data.items[w + (h * self.width)].y;
                     }
-                    if (self.map_data.items[w + (h * self.width)][1] > self.max_y) {
-                        self.max_y = self.map_data.items[w + (h * self.width)][1];
+                    if (self.map_data.items[w + (h * self.width)].y > self.max_y) {
+                        self.max_y = self.map_data.items[w + (h * self.width)].y;
                     }
-                    if (self.map_data.items[w + (h * self.width)][0] > self.max_x) {
-                        self.max_x = self.map_data.items[w + (h * self.width)][0];
+                    if (self.map_data.items[w + (h * self.width)].x > self.max_x) {
+                        self.max_x = self.map_data.items[w + (h * self.width)].x;
                     }
                 }
             }
-        }
 
-        pub fn rotateZ(self: *Self, Angle: f32) void {
-            const thetha = @mod(Angle * math.rad_per_deg, 6.28319);
-            const rounded_theta = roundToNearest(thetha, 0.01);
-            const u_rounded_theta = @mod(@as(u32, @intFromFloat(rounded_theta * 100)), 627);
-
-            const sin_theta = angle.precomputed_sin[u_rounded_theta];
-            const cos_theta = angle.precomputed_cos[u_rounded_theta];
-
-            for (0..self.height) |h| {
-                for (0..self.width) |w| {
-                    const new_x = (self.map_save.items[w + (h * self.width)][0] * cos_theta) - (self.map_save.items[w + (h * self.width)][1] * sin_theta);
-                    self.map_data.items[w + (h * self.width)][1] = (self.map_save.items[w + (h * self.width)][0] * sin_theta) + (self.map_save.items[w + (h * self.width)][1] * cos_theta);
-                    self.map_data.items[w + (h * self.width)][0] = new_x;
-                }
-            }
+            self.scale();
         }
 
         pub fn scale(self: *Self) void {
@@ -245,10 +301,10 @@ pub fn Map(comptime T: type) type {
 
             for (0..self.height) |h| {
                 for (0..self.width) |w| {
-                    self.map_data.items[w + (h * self.width)][0] *= s_factor;
-                    self.map_data.items[w + (h * self.width)][1] *= s_factor;
-                    self.map_data.items[w + (h * self.width)][0] += 1000 / 2.0;
-                    self.map_data.items[w + (h * self.width)][1] += 1000 / 2.0 - (yc_off * (s_factor) / 2);
+                    self.map_data.items[w + (h * self.width)].x *= s_factor;
+                    self.map_data.items[w + (h * self.width)].y *= s_factor;
+                    self.map_data.items[w + (h * self.width)].x += 1000 / 2.0;
+                    self.map_data.items[w + (h * self.width)].y += 1000 / 2.0 - (yc_off * (s_factor) / 2);
                 }
             }
         }
