@@ -6,7 +6,7 @@
 //   By: pollivie <pollivie.student.42.fr>          +#+  +:+       +#+        //
 //                                                +#+#+#+#+#+   +#+           //
 //   Created: 2024/07/12 16:17:15 by pollivie          #+#    #+#             //
-//   Updated: 2024/07/18 11:04:55 by bvan-pae         ###   ########.fr       //
+//   Updated: 2024/07/18 11:11:32 by bvan-pae         ###   ########.fr       //
 //                                                                            //
 // ************************************************************************** //
 
@@ -531,6 +531,23 @@ pub const MlxRessources = packed struct {
             },
             else => {},
         }
+
+        // data.mlx_res.curr_time = std.time.nanoTimestamp();
+        // const delta_time_ns = data.mlx_res.curr_time - data.mlx_res.last_time;
+        // const delta_time_s = @as(f32, @floatFromInt(delta_time_ns)) / 1_000_000_000.0;
+        // const fps = 1.0 / delta_time_s;
+        //
+        // // Print FPS
+        // std.debug.print("curr fps = {d}\n", .{fps});
+        // data.mlx_res.last_time = std.time.nanoTimestamp();
+        //
+        // var fps_str_buf: [64]u8 = undefined;
+        // const fps_str = std.fmt.bufPrint(&fps_str_buf, "{d}", .{fps}) catch "N/A";
+        // _ = fps_str; // autofix
+        //
+        // const original: []const u8 = "Hello, Zig!";
+        // const c_string: [*:0]u8 = @ptrCast(original);
+        // wrap_mlx_string_put(data.mlx_res.mlx, data.mlx_res.win, 930, 20, c_string);
 
         data.map.render();
         data.mlx_res.paintScreen(0x00);
