@@ -6,7 +6,7 @@
 //   By: pollivie <pollivie.student.42.fr>          +#+  +:+       +#+        //
 //                                                +#+#+#+#+#+   +#+           //
 //   Created: 2024/07/12 16:17:15 by pollivie          #+#    #+#             //
-//   Updated: 2024/07/12 16:17:16 by pollivie         ###   ########.fr       //
+//   Updated: 2024/07/18 11:04:55 by bvan-pae         ###   ########.fr       //
 //                                                                            //
 // ************************************************************************** //
 
@@ -404,6 +404,7 @@ const Key = enum(u32) {
     S_KEY = 115,
     D_KEY = 100,
     P_KEY = 112,
+    Q_KEY = 113,
     E_KEY = 101,
     ARROW_LEFT = 65361,
     ARROW_UP = 65362,
@@ -419,6 +420,7 @@ const Key = enum(u32) {
             45 => .MINUS,
             5 => .WHEEL_DOWN,
             119 => .W_KEY,
+            113 => .Q_KEY,
             97 => .A_KEY,
             115 => .S_KEY,
             100 => .D_KEY,
@@ -446,13 +448,10 @@ pub fn myMlxPixelPut(mlx_res: *MlxRessources, x: i16, y: i16, color: u32) void {
         // std.debug.print("drawinnnn...", .{});
         const fx: usize = @intCast(x);
         const fy: usize = @intCast(y);
-        mlx_res.*.data[fx + (fy * MlxRessources.height)] = color;
+        mlx_res.*.data[fx + (fy * MlxRessources.width)] = color;
     }
 }
 
-// Types in Zig should be PascalCased
-// since your type isn't use anywhere else
-// you can "hide" it inside of the type,
 const FdfData = packed struct {
     pressed: Key,
     map: *Map(f32),
@@ -493,9 +492,6 @@ pub const MlxRessources = packed struct {
         result.*.mlx = wrap_mlx_init();
         result.*.win = wrap_mlx_new_window(result.*.mlx, width, height, @constCast(@alignCast(@ptrCast(title.ptr))));
         result.*.img = wrap_mlx_new_image(result.*.mlx, width, height);
-        std.debug.print("init mlx_ptr = {*}\n", .{result.*.mlx});
-        std.debug.print("init win_ptr = {*}\n", .{result.*.win});
-        std.debug.print("init img_ptr = {*}\n", .{result.*.img});
         result.*.data = wrap_mlx_get_data_addr(result.*.img, &result.img_bits_per_pixel, &result.*.img_size, &result.*.img_endian);
         _ = wrap_mlx_put_image_to_window(result.*.mlx, result.*.win, result.*.img, 0, 0);
         return (result);
@@ -524,32 +520,19 @@ pub const MlxRessources = packed struct {
             Key.S_KEY => {
                 data.map.theta_x -= 1;
             },
+            Key.Q_KEY => {
+                data.map.theta_y -= 1;
+            },
+            Key.E_KEY => {
+                data.map.theta_y += 1;
+            },
             Key.ESCAPE => {
                 data.mlx_res.deinit();
             },
             else => {},
         }
 
-        data.mlx_res.curr_time = std.time.nanoTimestamp();
-        const delta_time_ns = data.mlx_res.curr_time - data.mlx_res.last_time;
-        const delta_time_s = @as(f32, @floatFromInt(delta_time_ns)) / 1_000_000_000.0;
-        const fps = 1.0 / delta_time_s;
-
-        // Print FPS
-        std.debug.print("curr fps = {d}\n", .{fps});
-        data.mlx_res.last_time = std.time.nanoTimestamp();
-
-        var fps_str_buf: [64]u8 = undefined;
-        const fps_str = std.fmt.bufPrint(&fps_str_buf, "{d}", .{fps}) catch "N/A";
-        _ = fps_str; // autofix
-
-        const original: []const u8 = "Hello, Zig!";
-        const c_string: [*:0]u8 = @ptrCast(original);
-        wrap_mlx_string_put(data.mlx_res.mlx, data.mlx_res.win, 930, 20, c_string);
-
-        data.map.rotateZ(data.map.theta_z);
-        data.map.rotateX(data.map.theta_x);
-        data.map.scale();
+        data.map.render();
         data.mlx_res.paintScreen(0x00);
         data.map.draw(data.mlx_res);
         data.mlx_res.pushImgToScreen();
@@ -571,7 +554,7 @@ pub const MlxRessources = packed struct {
     pub fn paintScreen(self: *Self, color: u32) void {
         for (0..height) |h| {
             for (0..width) |w| {
-                self.*.data[w + (h * height)] = color;
+                self.*.data[w + (h * width)] = color;
             }
         }
     }
