@@ -211,13 +211,16 @@ pub const MlxRessources = packed struct {
         std.debug.print("curr fps = {d}\n", .{fps});
         data.mlx_res.last_time = std.time.nanoTimestamp();
 
-        var fps_str_buf: [64]u8 = undefined;
-        const fps_str = std.fmt.bufPrint(&fps_str_buf, "{d}", .{fps}) catch "N/A";
-        _ = fps_str; // autofix
+        var fps_str_buf: [64:0]u8 = undefined;
+        if (std.fmt.bufPrintZ(&fps_str_buf, "{d}", .{fps})) |result| {
+            const fps_str: [*:0]u8 = result[0..:0].ptr;
+            _ = wrap_mlx_string_put(data.mlx_res.mlx, data.mlx_res.win, 930, 20, fps_str);
+        }else |_| {}
+        // const fps_str = std.fmt.bufPrint(&fps_str_buf, "{d}", .{fps}) catch "N/A";
 
-        const original: []const u8 = "Hello, Zig!";
-        const c_string: [*:0]u8 = @ptrCast(original);
-        wrap_mlx_string_put(data.mlx_res.mlx, data.mlx_res.win, 930, 20, c_string);
+        // const original: []const u8 = "Hello, Zig!";
+        // const c_string: [*:0]u8 = @ptrCast(original);
+        // wrap_mlx_string_put(data.mlx_res.mlx, data.mlx_res.win, 930, 20, fps_str);
 
         data.map.rotateZ(data.map.theta_z);
         data.map.rotateX(data.map.theta_x);
