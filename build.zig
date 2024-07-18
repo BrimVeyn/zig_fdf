@@ -34,7 +34,11 @@ pub const c_source_files = &[_][]const u8{
     "mlx_destroy_display.c",
 };
 
-pub const c_source_flags = &[_][]const u8{
+pub const c_release_flags = &[_][]const u8{
+    "-O3",
+};
+
+pub const c_debug_flags = &[_][]const u8{
     "-g3",
     "-fno-omit-frame-pointer",
 };
@@ -62,6 +66,11 @@ pub fn build(b: *std.Build) void {
     inline for (system_library) |syslib| {
         lib.linkSystemLibrary(syslib);
     }
+
+    const c_source_flags = switch (optimize) {
+        .Debug => c_debug_flags,
+        else => c_release_flags,
+    };
 
     inline for (c_source_files) |file| {
         lib.addCSourceFile(.{
