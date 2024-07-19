@@ -15,7 +15,10 @@ const ArrayList = std.ArrayList;
 const Allocator = std.mem.Allocator;
 const angle = @import("rotations.zig");
 const math = std.math;
+const lerp = math.lerp;
 const PI = math.pi;
+const COS30: f32 = 0.86602540378;
+const SIN30: f32 = 0.5;
 
 const backend = @import("backend.zig");
 const MlxRessources = backend.MlxRessources;
@@ -24,6 +27,8 @@ pub const MapError = error{
     wrong_z, //unexcepted Z value
     wrong_color, //Wrong color format
     empty_map, //Empty map lol
+    out_of_bonds,
+    parsing_error,
 };
 
 pub const RotateParams = struct {
@@ -54,42 +59,78 @@ pub const RotateParams = struct {
 };
 
 pub const ColorMode = enum(u32) {
-    var mode: u16 = 0;
+    pub var mode: u16 = 0;
     RGB,
+    RBG,
     BRG,
+    BGR,
+    GRB,
+    GBR,
 
-    pub fn switch_mode() void {
-        mode = @mod(mode + 1, 2);
+    pub fn switch_mode() u16 {
+        mode = @mod(mode + 1, 6);
+        return mode;
     }
 };
 
 pub const Color = struct {
     const Self = @This();
+    a: u8,
     r: u8,
     g: u8,
     b: u8,
-    a: u8,
 
     pub fn init(int_color: u32) Self {
         return Self{
+            .a = @intCast((int_color >> 24) & 0xFF),
             .r = @intCast((int_color >> 16) & 0xFF),
             .g = @intCast((int_color >> 8) & 0xFF),
             .b = @intCast(int_color & 0xFF),
-            .a = @intCast(int_color & 0xFF),
         };
     }
 
-    fn toInt(self: *Self, mode: ColorMode) u32 {
-        switch (mode) {
-            ColorMode.RGB => return (@as(u32, self.a) << 24) |
+    pub fn toInt(self: *const Self, color_mode: u16) u32 {
+        switch (color_mode) {
+            @intFromEnum(ColorMode.RGB) => return (@as(u32, self.a) << 24) |
                 (@as(u32, self.r) << 16) |
                 (@as(u32, self.g) << 8) |
                 @as(u32, self.b),
-            ColorMode.BRG => return (@as(u32, self.a) << 24) |
+            @intFromEnum(ColorMode.RBG) => return (@as(u32, self.a) << 24) |
+                (@as(u32, self.r) << 16) |
+                (@as(u32, self.b) << 8) |
+                @as(u32, self.g),
+            @intFromEnum(ColorMode.BGR) => return (@as(u32, self.a) << 24) |
+                (@as(u32, self.b) << 16) |
+                (@as(u32, self.g) << 8) |
+                @as(u32, self.r),
+            @intFromEnum(ColorMode.BRG) => return (@as(u32, self.a) << 24) |
                 (@as(u32, self.b) << 16) |
                 (@as(u32, self.r) << 8) |
                 @as(u32, self.g),
+            @intFromEnum(ColorMode.GBR) => return (@as(u32, self.a) << 24) |
+                (@as(u32, self.g) << 16) |
+                (@as(u32, self.r) << 8) |
+                @as(u32, self.b),
+            @intFromEnum(ColorMode.GRB) => return (@as(u32, self.a) << 24) |
+                (@as(u32, self.g) << 16) |
+                (@as(u32, self.r) << 8) |
+                @as(u32, self.b),
+            else => return 1,
         }
+    }
+
+    pub fn blendColors(color1: Color, color2: Color, alpha: f32) Color {
+        const inv_alpha = 1.0 - alpha;
+        return Color{
+            .a = 0,
+            .r = @as(u8, @intFromFloat((@as(f32, @floatFromInt(color1.r)) * inv_alpha) + (@as(f32, @floatFromInt(color2.r)) * alpha))),
+            .g = @as(u8, @intFromFloat((@as(f32, @floatFromInt(color1.g)) * inv_alpha) + (@as(f32, @floatFromInt(color2.g)) * alpha))),
+            .b = @as(u8, @intFromFloat((@as(f32, @floatFromInt(color1.b)) * inv_alpha) + (@as(f32, @floatFromInt(color2.b)) * alpha))),
+        };
+    }
+
+    pub fn debug(self: *Self) void {
+        std.debug.print("RGBA |{d}|{d}|{d}|{d}|\n", .{ self.r, self.g, self.b, self.a });
     }
 };
 
@@ -168,40 +209,40 @@ pub const Vector2 = struct {
         };
     }
 
-    pub fn getGradient(color_a: Color, color_b: Color, x: f32, color_mode: ColorMode) u32 {
-        const diff_r: u8 = @intCast(@abs(@as(i16, color_a.r) - @as(i16, color_b.r)));
-        const rounded_r: u8 = @intFromFloat(@round(@as(f32, @floatFromInt(diff_r)) * x));
-        const diff_g: u8 = @intCast(@abs(@as(i16, color_a.g) - @as(i16, color_b.g)));
-        const rounded_g: u8 = @intFromFloat(@round(@as(f32, @floatFromInt(diff_g)) * x));
-        const diff_b: u8 = @intCast(@abs(@as(i16, color_a.b) - @as(i16, color_b.b)));
-        const rounded_b: u8 = @intFromFloat(@round(@as(f32, @floatFromInt(diff_b)) * x));
-        const tmp_r = if (color_a.r < color_b.r) color_a.r + rounded_r else color_a.r - rounded_r;
-        const tmp_g = if (color_a.g < color_b.g) color_a.g + rounded_g else color_a.g - rounded_g;
-        const tmp_b = if (color_a.b < color_b.b) color_a.b + rounded_b else color_a.r - rounded_b;
+    pub fn getGradient(color_a: Color, color_b: Color, x: f32, color_mode: u16) u32 {
+        const r: u8 = @intFromFloat(@round(lerp(@as(f32, @floatFromInt(color_a.r)), @as(f32, @floatFromInt(color_b.r)), x)));
+        const g: u8 = @intFromFloat(@round(lerp(@as(f32, @floatFromInt(color_a.g)), @as(f32, @floatFromInt(color_b.g)), x)));
+        const b: u8 = @intFromFloat(@round(lerp(@as(f32, @floatFromInt(color_a.b)), @as(f32, @floatFromInt(color_b.b)), x)));
+
         var GradColor = Color{
             .a = 0,
-            .r = tmp_r,
-            .g = tmp_g,
-            .b = tmp_b,
+            .r = r,
+            .g = g,
+            .b = b,
         };
 
         return GradColor.toInt(color_mode);
     }
 
-    pub fn draw(self: *Self, mlx_res: *MlxRessources, color_a: Color, color_b: Color, color_mode: ColorMode) void {
+    pub fn draw(self: *Self, mlx_res: *MlxRessources, color_a: Color, color_b: Color, color_mode: u16) void {
         const int_dab: u16 = @intFromFloat(self.dab);
+
+        var compute_gradient: bool = true;
+        if (color_a.toInt(color_mode) == color_b.toInt(color_mode))
+            compute_gradient = false;
+
         for (0..int_dab) |i| {
-            const x: i16 = @intFromFloat(@round(self.ax + (self.dx * @as(f32, @as(f32, @floatFromInt(i)) / self.dab))));
-            const y: i16 = @intFromFloat(@round(self.ay + (self.dy * @as(f32, @as(f32, @floatFromInt(i)) / self.dab))));
-            // const color = 0x0000FF00;
-            // if (color_a.toInt(color_mode) == color_a.toInt(color_mode)) {
-            //     const color = color_a.toInt(color_mode);
-            //     backend.myMlxPixelPut(mlx_res, x, y, color);
-            // } else {
-            const color = getGradient(color_a, color_b, @as(f32, @as(f32, @floatFromInt(i)) / self.dab), color_mode);
-            backend.myMlxPixelPut(mlx_res, x, y, color);
-            // }
+            const x: i32 = @intFromFloat(@round(self.ax + (self.dx * @as(f32, @as(f32, @floatFromInt(i)) / self.dab))));
+            const y: i32 = @intFromFloat(@round(self.ay + (self.dy * @as(f32, @as(f32, @floatFromInt(i)) / self.dab))));
+            const color = if (compute_gradient) getGradient(color_a, color_b, @as(f32, @as(f32, @floatFromInt(i)) / self.dab), color_mode) else color_a.toInt(color_mode);
+            if (backend.myMlxPixelPut(mlx_res, x, y, color)) {} else |_| {
+                break;
+            }
         }
+    }
+
+    pub fn oob(self: *Self, mlx_res: *MlxRessources) bool {
+        return ((self.ax < 0 or self.ax > @as(f32, @floatFromInt(mlx_res.*.width))) and (self.ay < 0 or self.ay > @as(f32, @floatFromInt(mlx_res.*.height))) and (self.bx < 0 or self.bx > @as(f32, @floatFromInt(mlx_res.*.width))) and (self.by < 0 or self.by > @as(f32, @floatFromInt(mlx_res.*.height))));
     }
 
     pub fn debug(self: *Self) void {
@@ -222,20 +263,18 @@ pub fn Map(comptime T: type) type {
         color_data: ArrayList(Color),
         map_data: ArrayList(Point),
         map_save: ArrayList(Point),
+
         theta_z: f32,
         theta_x: f32,
         theta_y: f32,
 
-        z_factor: f32,
-        min_x: f32,
-        max_x: f32,
-        min_y: f32,
-        max_y: f32,
+        zoom_scalar: f32,
+        z_axis_scalar: f32,
 
         width: usize,
         height: usize,
 
-        color_mode: ColorMode,
+        color_mode: u16,
 
         pub fn init(allocator: Allocator) Allocator.Error!*Self {
             const new: *Self = try allocator.create(Self);
@@ -246,15 +285,12 @@ pub fn Map(comptime T: type) type {
                 .map_save = ArrayList(Point).init(allocator),
                 .width = 0,
                 .height = 0,
-                .theta_z = 45,
-                .theta_x = 45,
+                .theta_x = 0,
                 .theta_y = 0,
-                .z_factor = 1,
-                .min_x = 0,
-                .max_x = 0,
-                .min_y = 0,
-                .max_y = 0,
-                .color_mode = ColorMode.RGB,
+                .theta_z = 0,
+                .zoom_scalar = 1,
+                .z_axis_scalar = 1,
+                .color_mode = ColorMode.mode,
             };
             return (new);
         }
@@ -337,48 +373,37 @@ pub fn Map(comptime T: type) type {
             return result;
         }
 
-        pub fn render(self: *Self) void {
-            self.min_x = 0;
-            self.min_y = 0;
-            self.max_x = 0;
-            self.max_y = 0;
-
-            const rotation_params = RotateParams.init(self.theta_x, self.theta_y, self.theta_z);
+        pub fn multZAxisScalar(self: *Self, step: f32) void {
             for (0..self.height) |h| {
                 for (0..self.width) |w| {
-                    self.map_data.items[w + (h * self.width)] = rotateXYZ(rotation_params, self.map_save.items[w + (h * self.width)]);
-
-                    if (self.map_data.items[w + (h * self.width)].x < self.min_x) {
-                        self.min_x = self.map_data.items[w + (h * self.width)].x;
-                    }
-                    if (self.map_data.items[w + (h * self.width)].y < self.min_y) {
-                        self.min_y = self.map_data.items[w + (h * self.width)].y;
-                    }
-                    if (self.map_data.items[w + (h * self.width)].y > self.max_y) {
-                        self.max_y = self.map_data.items[w + (h * self.width)].y;
-                    }
-                    if (self.map_data.items[w + (h * self.width)].x > self.max_x) {
-                        self.max_x = self.map_data.items[w + (h * self.width)].x;
-                    }
+                    self.map_save.items[w + (h * self.width)].z *= step;
                 }
             }
-
-            self.scale();
         }
 
-        pub fn scale(self: *Self) void {
-            const yc_off = self.min_y + self.max_y;
-            const x_factor = 1000 / (self.max_x - self.min_x);
-            const y_factor = 1000 / (self.max_y - self.min_y);
-            var s_factor = if (x_factor >= y_factor) y_factor else x_factor;
-            s_factor *= 0.99;
+        pub fn project(v0: Point) Point {
+            return Point{
+                .x = (v0.x - v0.y) * COS30,
+                .y = (v0.x + v0.y) * SIN30 - v0.z,
+                .z = v0.z,
+                .color = v0.color,
+            };
+        }
+
+        pub fn render(self: *Self, windowH: usize, windowW: usize) void {
+            const half_width = @as(f32, @floatFromInt(windowW)) / 2.0;
+            const half_height = @as(f32, @floatFromInt(windowH)) / 2.0;
+            const rotation_params = RotateParams.init(self.theta_x, self.theta_y, self.theta_z);
 
             for (0..self.height) |h| {
                 for (0..self.width) |w| {
-                    self.map_data.items[w + (h * self.width)].x *= s_factor;
-                    self.map_data.items[w + (h * self.width)].y *= s_factor;
-                    self.map_data.items[w + (h * self.width)].x += 1000 / 2.0;
-                    self.map_data.items[w + (h * self.width)].y += 1000 / 2.0 - (yc_off * (s_factor) / 2);
+                    //Rotate
+                    self.map_data.items[w + (h * self.width)] = rotateXYZ(rotation_params, self.map_save.items[w + (h * self.width)]);
+                    //Project
+                    self.map_data.items[w + (h * self.width)] = project(self.map_data.items[w + (h * self.width)]);
+                    //Zoom
+                    self.map_data.items[w + (h * self.width)].x = self.map_data.items[w + (h * self.width)].x * self.zoom_scalar + half_width;
+                    self.map_data.items[w + (h * self.width)].y = self.map_data.items[w + (h * self.width)].y * self.zoom_scalar + half_height;
                 }
             }
         }
@@ -388,14 +413,24 @@ pub fn Map(comptime T: type) type {
                 for (0..self.width) |w| {
                     if (w < self.width - 1) {
                         var vect_ab = Vector2.init(self.map_data.items[w + (h * self.width)], self.map_data.items[(w + 1) + (h * self.width)]);
-                        vect_ab.draw(mlx_res, self.map_data.items[w + (h * self.width)].color, self.map_data.items[(w + 1) + (h * self.width)].color, self.color_mode);
+                        if (!vect_ab.oob(mlx_res))
+                            vect_ab.draw(mlx_res, self.map_data.items[w + (h * self.width)].color, self.map_data.items[(w + 1) + (h * self.width)].color, self.color_mode);
                     }
                     if (h < self.height - 1) {
                         var vect_ab = Vector2.init(self.map_data.items[w + (h * self.width)], self.map_data.items[w + ((h + 1) * self.width)]);
-                        vect_ab.draw(mlx_res, self.map_data.items[w + (h * self.width)].color, self.map_data.items[(w + ((h + 1) * self.width))].color, self.color_mode);
+                        if (!vect_ab.oob(mlx_res))
+                            vect_ab.draw(mlx_res, self.map_data.items[w + (h * self.width)].color, self.map_data.items[(w + ((h + 1) * self.width))].color, self.color_mode);
                     }
                 }
             }
+        }
+
+        pub fn reset(self: *Self) void {
+            self.theta_y = 0;
+            self.theta_z = 0;
+            self.theta_x = 0;
+            self.zoom_scalar = 1;
+            self.z_axis_scalar = 1;
         }
 
         pub fn debugMapData(self: *Self) void {

@@ -13,29 +13,66 @@ const MapError = map.MapError;
 const Point = map.Point;
 const Color = map.Color;
 
-// this is done in order to prevent the lazy evaluation
-// such that it will still work when you do zig build test
 comptime {
     _ = map;
 }
 
+pub const Resolution = struct {
+    height: u16,
+    width: u16,
+};
+
+fn setResolution() !Resolution {
+    const args = std.os.argv;
+    var res_height: u16 = undefined;
+    var res_width: u16 = undefined;
+
+    if (args.len != 3) {
+        std.log.err("usage: ./fdf [width] [height]", .{});
+        return error.resolution_error;
+    }
+
+    const len_width: usize = std.mem.len(args[1]);
+    const width_zig_string: []const u8 = args[1][0..len_width];
+    const width_result = std.fmt.parseInt(u16, width_zig_string, 10);
+
+    if (width_result) |width| {
+        res_width = width;
+    } else |_| {
+        return error.resolution_error;
+    }
+
+    const len_height: usize = std.mem.len(args[2]);
+    const height_zig_string: []const u8 = args[2][0..len_height];
+    const height_result = std.fmt.parseInt(u16, height_zig_string, 10);
+
+    if (height_result) |height| {
+        res_height = height;
+    } else |_| {
+        return error.resolution_error;
+    }
+
+    std.debug.print("Loading [screenHeight = {d}, screenWidth = {d}]\n", .{ res_width, res_height });
+    return Resolution{
+        .width = res_width,
+        .height = res_height,
+    };
+}
+
 pub fn main() !void {
+    const windowResolution = try setResolution();
+
     var gpa = std.heap.GeneralPurposeAllocator(.{ .safety = true }){};
     defer _ = gpa.deinit();
     var allocator = gpa.allocator();
-    const mlx_res = try MlxRessources.init(&allocator);
+    const mlx_res = try MlxRessources.init(&allocator, windowResolution.width, windowResolution.height);
 
     const fdfmap = try Map(f32).init(allocator);
     defer fdfmap.deinit();
 
     if (fdfmap.parse(map_42)) |_| {
-        // fdfmap.debugMapData();
-        fdfmap.render();
-        fdfmap.draw(mlx_res);
-        mlx_res.pushImgToScreen();
-        // mlx_res.paintScreen(0x0);
-        // fdfmap.debugPoint();
-        std.debug.print("heihgt = {d}\n", .{fdfmap.height});
+        std.debug.print("Map infos:\n", .{});
+        std.debug.print("height = {d}\n", .{fdfmap.height});
         std.debug.print("width = {d}\n", .{fdfmap.width});
     } else |e| {
         switch (e) {

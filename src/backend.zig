@@ -1,15 +1,3 @@
-// ************************************************************************** //
-//                                                                            //
-//                                                        :::      ::::::::   //
-//   backend.zig                                        :+:      :+:    :+:   //
-//                                                    +:+ +:+         +:+     //
-//   By: pollivie <pollivie.student.42.fr>          +#+  +:+       +#+        //
-//                                                +#+#+#+#+#+   +#+           //
-//   Created: 2024/07/12 16:17:15 by pollivie          #+#    #+#             //
-//   Updated: 2024/07/18 20:48:14 by bvan-pae         ###   ########.fr       //
-//                                                                            //
-// ************************************************************************** //
-
 /// Here we put aside everything related to the mlx backend such that we don't
 /// have to see all that ugly code.
 const std = @import("std");
@@ -72,6 +60,8 @@ const Key = enum(u32) {
     PLUS = 61,
     MINUS = 45,
     WHEEL_DOWN = 5,
+    R_KEY = 114,
+    C_KEY = 99,
     W_KEY = 119,
     A_KEY = 97,
     S_KEY = 115,
@@ -79,13 +69,15 @@ const Key = enum(u32) {
     P_KEY = 112,
     Q_KEY = 113,
     E_KEY = 101,
+    M_KEY = 109,
+    G_KEY = 103,
     ARROW_LEFT = 65361,
     ARROW_UP = 65362,
     ARROW_RIGHT = 65363,
     ARROW_DOWN = 65364,
     ESCAPE = 65307,
-    PLEFT = 91,
-    PRIGHT = 93,
+    LEFT_BRACKET = 91,
+    RIGHT_BRACKET = 93,
 
     pub fn toEnum(keycode: u32) Key {
         return switch (keycode) {
@@ -95,35 +87,41 @@ const Key = enum(u32) {
             119 => .W_KEY,
             113 => .Q_KEY,
             97 => .A_KEY,
+            114 => .R_KEY,
+            99 => .C_KEY,
+            103 => .G_KEY,
             115 => .S_KEY,
             100 => .D_KEY,
             112 => .P_KEY,
             101 => .E_KEY,
-
+            109 => .M_KEY,
             65361 => .ARROW_LEFT,
             65362 => .ARROW_UP,
             65363 => .ARROW_RIGHT,
             65364 => .ARROW_DOWN,
             65307 => .ESCAPE,
-            91 => .PLEFT,
-            93 => .PRIGHT,
+            91 => .LEFT_BRACKET,
+            93 => .RIGHT_BRACKET,
             else => .None,
         };
     }
 };
 
-const Map = @import("map.zig").Map;
-const ColorMode = @import("map.zig").ColorMode;
+const map_file = @import("map.zig");
+const Map = map_file.Map;
+const Color = map_file.Color;
+const ColorMode = map_file.ColorMode;
+const MapError = map_file.MapError;
 
 // should probably be a member function but it's good anyway
-pub fn myMlxPixelPut(mlx_res: *MlxRessources, x: i16, y: i16, color: u32) void {
-    if (x > 1000 or x < 0 or y > 1000 or y < 0) {
-        return;
+pub fn myMlxPixelPut(mlx_res: *MlxRessources, x: i32, y: i32, color: u32) !void {
+    if (x > mlx_res.*.width or x < 0 or y > mlx_res.*.height or y < 0) {
+        return MapError.out_of_bonds;
     } else {
         // std.debug.print("drawinnnn...", .{});
         const fx: usize = @intCast(x);
         const fy: usize = @intCast(y);
-        mlx_res.*.data[fx + (fy * MlxRessources.width)] = color;
+        mlx_res.*.data[fx + (fy * mlx_res.*.width)] = color;
     }
 }
 
@@ -132,8 +130,6 @@ const FdfData = packed struct {
     map: *Map(f32),
     mlx_res: *MlxRessources,
 
-    // the hashmap feels unecessary, you can simply use the enum directly
-    // go to your loop to see how you could do it
     pub fn init(mlx_res: *MlxRessources, map: *Map(f32)) FdfData {
         return FdfData{
             .mlx_res = mlx_res,
@@ -145,8 +141,6 @@ const FdfData = packed struct {
 
 pub const MlxRessources = packed struct {
     const Self = @This();
-    const width: i32 = 1000;
-    const height: i32 = 1000;
     const title: [:0]const u8 = "fdf";
     allocator: *std.mem.Allocator,
     mlx: ?*anyopaque,
@@ -160,13 +154,20 @@ pub const MlxRessources = packed struct {
     img_endian: i32,
     last_time: i128,
     curr_time: i128,
+    width: usize,
+    height: usize,
 
-    pub fn init(allocator: *std.mem.Allocator) !*MlxRessources {
+    gui: bool,
+
+    pub fn init(allocator: *std.mem.Allocator, w: usize, h: usize) !*MlxRessources {
         var result = try allocator.create(MlxRessources);
+        result.*.gui = false;
+        result.*.width = w;
+        result.*.height = h;
         result.*.allocator = allocator;
         result.*.mlx = wrap_mlx_init();
-        result.*.win = wrap_mlx_new_window(result.*.mlx, width, height, @constCast(@alignCast(@ptrCast(title.ptr))));
-        result.*.img = wrap_mlx_new_image(result.*.mlx, width, height);
+        result.*.win = wrap_mlx_new_window(result.*.mlx, @intCast(result.*.width), @intCast(result.*.height), @constCast(@alignCast(@ptrCast(title.ptr))));
+        result.*.img = wrap_mlx_new_image(result.*.mlx, @intCast(result.*.width), @intCast(result.*.height));
         result.*.data = wrap_mlx_get_data_addr(result.*.img, &result.img_bits_per_pixel, &result.*.img_size, &result.*.img_endian);
         _ = wrap_mlx_put_image_to_window(result.*.mlx, result.*.win, result.*.img, 0, 0);
         return (result);
@@ -180,65 +181,79 @@ pub const MlxRessources = packed struct {
         return (1);
     }
 
+    pub fn guiToggle(self: *Self) void {
+        self.gui = !self.gui;
+    }
+
+    pub fn renderGui(self: *Self) void {
+        // std.debug.print("GUI RENDERED\n", .{});
+        const third_screen_width = self.width / 3;
+
+        for (0..self.height) |h| {
+            for (0..third_screen_width) |w| {
+                const item = self.data[w + (h * self.width)];
+                const col = Color.init(item);
+                const color = Color.blendColors(col, Color.init(0x00F6E7CB), 0.5);
+                // color.debug();
+                if (myMlxPixelPut(self, @intCast(w), @intCast(h), color.toInt(0))) {} else |_| {
+                    break;
+                }
+            }
+        }
+    }
+
     pub fn fdfLoop(param: ?*anyopaque) callconv(.C) c_int {
         var data = @as(*FdfData, @alignCast(@ptrCast(param orelse return (0))));
+
         switch (data.pressed) {
-            Key.D_KEY => {
-                data.map.theta_z += 1;
-            },
-            Key.A_KEY => {
-                data.map.theta_z -= 1;
-            },
-            Key.W_KEY => {
-                data.map.theta_x += 1;
-            },
-            Key.S_KEY => {
-                data.map.theta_x -= 1;
-            },
-            Key.Q_KEY => {
-                data.map.theta_y -= 1;
-            },
-            Key.E_KEY => {
-                data.map.theta_y += 1;
-            },
-            Key.P_KEY => {
-                ColorMode.switch_mode();
-            },
-            Key.ESCAPE => {
-                data.mlx_res.deinit();
-            },
+            Key.G_KEY => data.mlx_res.guiToggle(),
+            Key.D_KEY => data.map.theta_z += 1,
+            Key.A_KEY => data.map.theta_z -= 1,
+            Key.W_KEY => data.map.theta_x += 1,
+            Key.S_KEY => data.map.theta_x -= 1,
+            Key.Q_KEY => data.map.theta_y -= 1,
+            Key.E_KEY => data.map.theta_y += 1,
+            Key.PLUS => data.map.zoom_scalar *= 1.1,
+            Key.MINUS => data.map.zoom_scalar /= 1.1,
+            Key.LEFT_BRACKET => data.map.multZAxisScalar(0.98),
+            Key.RIGHT_BRACKET => data.map.multZAxisScalar(1.02),
+            Key.C_KEY => data.map.color_mode = ColorMode.switch_mode(),
+            Key.R_KEY => data.map.reset(),
+            Key.ESCAPE => data.mlx_res.deinit(),
             else => {},
         }
 
-        data.mlx_res.curr_time = std.time.nanoTimestamp();
-        const delta_time_ns = data.mlx_res.curr_time - data.mlx_res.last_time;
-        const delta_time_s = @as(f32, @floatFromInt(delta_time_ns)) / 1_000_000_000.0;
-        const fps = @round(1.0 / delta_time_s);
-
-        // Print FPS
-        // std.debug.print("curr fps = {d}\n", .{fps});
-        data.mlx_res.last_time = std.time.nanoTimestamp();
-
-        data.map.render();
+        data.map.render(data.mlx_res.height, data.mlx_res.width);
         data.mlx_res.paintScreen(0x00);
         data.map.draw(data.mlx_res);
         data.mlx_res.pushImgToScreen();
-        var fps_str_buf: [64:0]u8 = undefined;
-        if (std.fmt.bufPrintZ(&fps_str_buf, "FPS: {d}", .{fps})) |result| {
-            const fps_str: [*:0]u8 = result[0.. :0].ptr;
-            var font_str = "8x16";
-            const c_font_str: [*:0]const u8 = font_str[0.. :0].ptr;
-            _ = wrap_mlx_set_font(data.mlx_res.mlx, data.mlx_res.win, c_font_str);
-            _ = wrap_mlx_string_put(data.mlx_res.mlx, data.mlx_res.win, 930, 20, 0xFFFFFF, fps_str);
-        } else |_| {}
+        MlxRessources.displayFPS(data);
+        if (data.mlx_res.gui)
+            data.mlx_res.renderGui();
+
         return 0;
     }
 
+    fn displayFPS(data: *FdfData) void {
+        data.mlx_res.curr_time = std.time.nanoTimestamp();
+        const delta_time_s = @as(f32, @floatFromInt(data.mlx_res.curr_time - data.mlx_res.last_time)) / 1_000_000_000.0;
+        const fps = @round(1.0 / delta_time_s);
+        data.mlx_res.last_time = std.time.nanoTimestamp();
+
+        var fps_str_buf: [64:0]u8 = undefined;
+        if (std.fmt.bufPrintZ(&fps_str_buf, "FPS: {d}", .{fps})) |result| {
+            const fps_str: [*:0]u8 = result[0.. :0].ptr;
+            _ = wrap_mlx_string_put(data.mlx_res.mlx, data.mlx_res.win, @intCast(data.mlx_res.width - 70), 20, 0xFFFFFF, fps_str);
+        } else |_| {}
+    }
+
     pub fn loop(mlx_res: *MlxRessources, map: *Map(f32)) void {
-        mlx_res.last_time = std.time.nanoTimestamp();
         var data = FdfData.init(mlx_res, map);
         const ptr = @as(?*anyopaque, @alignCast(@ptrCast(&data)));
         const mlx_ptr = @as(?*anyopaque, @alignCast(@ptrCast(mlx_res)));
+        var font_str = "8x16";
+        const c_font_str: [*:0]const u8 = font_str[0.. :0].ptr;
+        _ = wrap_mlx_set_font(data.mlx_res.mlx, data.mlx_res.win, c_font_str);
         _ = wrap_mlx_hook_1(mlx_res.win, @as(i32, 17), @as(i32, 1 << 17), on_program_quit, mlx_ptr);
         _ = wrap_mlx_hook_2(mlx_res.win, 2, @as(i64, 1 << 0), keyHandler, ptr);
         _ = wrap_mlx_hook_2(mlx_res.win, 3, @as(i64, 1 << 1), keyReleaseHandler, ptr);
@@ -247,15 +262,16 @@ pub const MlxRessources = packed struct {
     }
 
     pub fn paintScreen(self: *Self, color: u32) void {
-        for (0..height) |h| {
-            for (0..width) |w| {
-                self.*.data[w + (h * width)] = color;
+        for (0..self.height) |h| {
+            for (0..self.width) |w| {
+                self.*.data[w + (h * self.width)] = color;
             }
         }
     }
 
     pub fn keyHandler(keycode: i32, maybe_data: ?*anyopaque) callconv(.C) c_int {
         const data = @as(?*FdfData, @alignCast(@ptrCast(maybe_data))) orelse return (0);
+        std.debug.print("keycode = {d}\n", .{keycode});
         data.pressed = Key.toEnum(@bitCast(keycode));
         return 0;
     }
