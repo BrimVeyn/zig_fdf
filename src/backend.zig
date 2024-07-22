@@ -132,19 +132,23 @@ pub fn myMlxPixelPut(mlx_res: *MlxRessources, x: i32, y: i32, color: u32) !void 
 
 const FdfData = packed struct {
     pressed: Key,
+    repeated: Key,
     map: *Map(f32),
     mlx_res: *MlxRessources,
+    time_to_press: i64,
 
     pub fn init(mlx_res: *MlxRessources, map: *Map(f32)) FdfData {
         return FdfData{
             .mlx_res = mlx_res,
             .map = map,
             .pressed = .None,
+            .repeated = .None,
+            .time_to_press = std.time.milliTimestamp(),
         };
     }
 };
 
-pub const MlxRessources = packed struct {
+pub const MlxRessources = struct {
     const Self = @This();
     const title: [:0]const u8 = "fdf";
     allocator: *std.mem.Allocator,
@@ -162,7 +166,18 @@ pub const MlxRessources = packed struct {
     width: usize,
     height: usize,
 
+    map_dir: std.fs.Dir,
+    map_it: std.fs.Dir.Iterator,
+
     gui: bool,
+
+    fn getMapDir() !std.fs.Dir {
+        const cwd = std.fs.cwd();
+
+        const dir = try cwd.openDir("./src/test_maps", .{ .iterate = true });
+
+        return dir;
+    }
 
     pub fn init(allocator: *std.mem.Allocator, w: usize, h: usize) !*MlxRessources {
         var result = try allocator.create(MlxRessources);
@@ -175,6 +190,8 @@ pub const MlxRessources = packed struct {
         result.*.img = wrap_mlx_new_image(result.*.mlx, @intCast(result.*.width), @intCast(result.*.height));
         result.*.data = wrap_mlx_get_data_addr(result.*.img, &result.img_bits_per_pixel, &result.*.img_size, &result.*.img_endian);
         _ = wrap_mlx_put_image_to_window(result.*.mlx, result.*.win, result.*.img, 0, 0);
+        result.*.map_dir = try getMapDir();
+        result.*.map_it = result.*.map_dir.iterate();
         return (result);
     }
 
@@ -208,44 +225,65 @@ pub const MlxRessources = packed struct {
     }
 
     fn switchMap(data: *FdfData) void {
-        data.map.deinit();
+        // data.map.deinit();
 
-        data.map = try Map(f32).init(data.map.allocator);
-        var file = try io.readAll();
-        defer file.close();
+        if (Map(f32).init(data.map.allocator)) |new_map| {
+            data.map = new_map;
+        } else |_| {}
 
-        var allocator = std.heap.page_allocator;
-        const file_content = try io.readAll(file.reader, allocator);
-        defer allocator.free(file_content);
-
-        if (data.map.parse(file_content)) |_| {
-            std.debug.print("yes\n", .{});
-        }
-
-        try std.io.getStdOut().writer.print("{}", .{file_content});
+        if (data.mlx_res.map_it.next()) |maybe_entry| {
+            if (maybe_entry) |entry| {
+                std.debug.print("entry name = {s}\n", .{entry.name});
+                if (data.mlx_res.map_dir.openFile(entry.name, .{})) |new_map_file| {
+                    defer new_map_file.close();
+                    if (new_map_file.readToEndAlloc(data.map.allocator, 50_000_000)) |new_map_buffer| {
+                        if (data.map.parse(new_map_buffer)) |_| {
+                            const largest: bool = data.map.width > data.map.height;
+                            var vect = @Vector(2, usize){ data.map.height, data.mlx_res.height };
+                            if (largest) {
+                                vect[0] = data.map.width;
+                                vect[1] = data.mlx_res.width;
+                            }
+                            data.map.zoom_scalar = @as(f32, @floatFromInt(vect[1])) / @as(f32, @floatFromInt(vect[0])) * 0.5;
+                            std.debug.print("Map infos:\n", .{});
+                            std.debug.print("height = {d}\n", .{data.map.height});
+                            std.debug.print("width = {d}\n", .{data.map.width});
+                        } else |e| {
+                            std.debug.print("e = {any}", .{e});
+                        }
+                    } else |_| {}
+                } else |_| {}
+            } else data.mlx_res.map_it.reset();
+        } else |_| {}
     }
 
     pub fn fdfLoop(param: ?*anyopaque) callconv(.C) c_int {
         var data = @as(*FdfData, @alignCast(@ptrCast(param orelse return (0))));
 
-        switch (data.pressed) {
-            Key.G_KEY => data.mlx_res.guiToggle(),
+        switch (data.repeated) {
             Key.D_KEY => data.map.theta_z += 1,
             Key.A_KEY => data.map.theta_z -= 1,
             Key.W_KEY => data.map.theta_y += 1,
             Key.S_KEY => data.map.theta_y -= 1,
             Key.Q_KEY => data.map.theta_x -= 1,
             Key.E_KEY => data.map.theta_x += 1,
-            Key.F_KEY => switchMap(data),
             Key.PLUS => data.map.zoom_scalar *= 1.1,
             Key.MINUS => data.map.zoom_scalar /= 1.1,
             Key.LEFT_BRACKET => data.map.multZAxisScalar(0.98),
             Key.RIGHT_BRACKET => data.map.multZAxisScalar(1.02),
+            else => {},
+        }
+
+        switch (data.pressed) {
+            Key.G_KEY => data.mlx_res.guiToggle(),
             Key.C_KEY => data.map.color_mode = ColorMode.switch_mode(),
+            Key.F_KEY => switchMap(data),
             Key.R_KEY => data.map.reset(),
             Key.ESCAPE => data.mlx_res.deinit(),
             else => {},
         }
+
+        data.pressed = .None;
 
         data.map.render(data.mlx_res.height, data.mlx_res.width);
         data.mlx_res.paintScreen(0x00);
@@ -277,6 +315,9 @@ pub const MlxRessources = packed struct {
         const mlx_ptr = @as(?*anyopaque, @alignCast(@ptrCast(mlx_res)));
         var font_str = "8x16";
         const c_font_str: [*:0]const u8 = font_str[0.. :0].ptr;
+
+        data.map.zoom_scalar = @as(f32, @floatFromInt(data.mlx_res.width)) / @as(f32, @floatFromInt(data.map.width));
+
         _ = wrap_mlx_set_font(data.mlx_res.mlx, data.mlx_res.win, c_font_str);
         _ = wrap_mlx_hook_1(mlx_res.win, @as(i32, 17), @as(i32, 1 << 17), on_program_quit, mlx_ptr);
         _ = wrap_mlx_hook_2(mlx_res.win, 2, @as(i64, 1 << 0), keyHandler, ptr);
@@ -295,13 +336,24 @@ pub const MlxRessources = packed struct {
 
     pub fn keyHandler(keycode: i32, maybe_data: ?*anyopaque) callconv(.C) c_int {
         const data = @as(?*FdfData, @alignCast(@ptrCast(maybe_data))) orelse return (0);
-        std.debug.print("keycode = {d}\n", .{keycode});
-        data.pressed = Key.toEnum(@bitCast(keycode));
-        return 0;
+        switch (keycode) {
+            @intFromEnum(Key.F_KEY), @intFromEnum(Key.ESCAPE), @intFromEnum(Key.C_KEY), @intFromEnum(Key.G_KEY), @intFromEnum(Key.R_KEY) => {
+                if (std.time.milliTimestamp() >= data.time_to_press) {
+                    data.pressed = Key.toEnum(@bitCast(keycode));
+                    data.time_to_press = std.time.milliTimestamp() + 200;
+                    std.debug.print("pressed\n", .{});
+                }
+            },
+            else => {
+                data.repeated = Key.toEnum(@bitCast(keycode));
+            },
+        }
+        return (0);
     }
 
     pub fn keyReleaseHandler(_: i32, maybe_data: ?*anyopaque) callconv(.C) c_int {
         const data = @as(?*FdfData, @alignCast(@ptrCast(maybe_data))) orelse return (0);
+        data.repeated = .None;
         data.pressed = .None;
         return (0);
     }
@@ -319,6 +371,7 @@ pub const MlxRessources = packed struct {
         _ = wrap_mlx_destroy_window(mlx_res.*.mlx, mlx_res.*.win);
         _ = wrap_mlx_destroy_display(mlx_res.*.mlx.?);
         _ = libmlx.free(mlx_res.*.mlx.?);
+        mlx_res.map_dir.close();
         allocator.destroy(mlx_res);
         std.posix.exit(0);
     }

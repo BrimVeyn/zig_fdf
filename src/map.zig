@@ -29,6 +29,7 @@ pub const MapError = error{
     empty_map, //Empty map lol
     out_of_bonds,
     parsing_error,
+    opendir_error, //opening test_map dir failed
 };
 
 pub const RotateParams = struct {
