@@ -71,6 +71,7 @@ const Key = enum(u32) {
     E_KEY = 101,
     M_KEY = 109,
     G_KEY = 103,
+    F_KEY = 102,
     ARROW_LEFT = 65361,
     ARROW_UP = 65362,
     ARROW_RIGHT = 65363,
@@ -90,6 +91,7 @@ const Key = enum(u32) {
             114 => .R_KEY,
             99 => .C_KEY,
             103 => .G_KEY,
+            102 => .F_KEY,
             115 => .S_KEY,
             100 => .D_KEY,
             112 => .P_KEY,
@@ -112,6 +114,9 @@ const Map = map_file.Map;
 const Color = map_file.Color;
 const ColorMode = map_file.ColorMode;
 const MapError = map_file.MapError;
+
+const io = std.io;
+const os = std.os;
 
 // should probably be a member function but it's good anyway
 pub fn myMlxPixelPut(mlx_res: *MlxRessources, x: i32, y: i32, color: u32) !void {
@@ -202,6 +207,24 @@ pub const MlxRessources = packed struct {
         }
     }
 
+    fn switchMap(data: *FdfData) void {
+        data.map.deinit();
+
+        data.map = try Map(f32).init(data.map.allocator);
+        var file = try io.readAll();
+        defer file.close();
+
+        var allocator = std.heap.page_allocator;
+        const file_content = try io.readAll(file.reader, allocator);
+        defer allocator.free(file_content);
+
+        if (data.map.parse(file_content)) |_| {
+            std.debug.print("yes\n", .{});
+        }
+
+        try std.io.getStdOut().writer.print("{}", .{file_content});
+    }
+
     pub fn fdfLoop(param: ?*anyopaque) callconv(.C) c_int {
         var data = @as(*FdfData, @alignCast(@ptrCast(param orelse return (0))));
 
@@ -209,10 +232,11 @@ pub const MlxRessources = packed struct {
             Key.G_KEY => data.mlx_res.guiToggle(),
             Key.D_KEY => data.map.theta_z += 1,
             Key.A_KEY => data.map.theta_z -= 1,
-            Key.W_KEY => data.map.theta_x += 1,
-            Key.S_KEY => data.map.theta_x -= 1,
-            Key.Q_KEY => data.map.theta_y -= 1,
-            Key.E_KEY => data.map.theta_y += 1,
+            Key.W_KEY => data.map.theta_y += 1,
+            Key.S_KEY => data.map.theta_y -= 1,
+            Key.Q_KEY => data.map.theta_x -= 1,
+            Key.E_KEY => data.map.theta_x += 1,
+            Key.F_KEY => switchMap(data),
             Key.PLUS => data.map.zoom_scalar *= 1.1,
             Key.MINUS => data.map.zoom_scalar /= 1.1,
             Key.LEFT_BRACKET => data.map.multZAxisScalar(0.98),
