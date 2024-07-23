@@ -13,9 +13,14 @@ const MapError = map.MapError;
 const Point = map.Point;
 const Color = map.Color;
 
-comptime {
-    _ = map;
-}
+pub const FdfError = error{
+    wrong_z, //unexcepted Z value
+    wrong_color, //Wrong color format
+    empty_map, //Empty map lol
+    out_of_bonds,
+    parsing_error,
+    opendir_error, //opening test_map dir failed
+};
 
 pub const Resolution = struct {
     height: u16,
@@ -67,7 +72,7 @@ pub fn main() !void {
     var allocator = gpa.allocator();
     const mlx_res = try MlxRessources.init(&allocator, windowResolution.width, windowResolution.height);
 
-    const fdfmap = try Map(f32).init(allocator);
+    const fdfmap = try Map.init(allocator);
     defer fdfmap.deinit();
 
     if (fdfmap.parse(map_42)) |_| {
