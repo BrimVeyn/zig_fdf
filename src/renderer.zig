@@ -102,11 +102,9 @@ pub const Renderer = packed struct {
     }
 
     pub fn myMlxPixelPut(self: *Self, x: i32, y: i32, color: u32) !void {
-        if (x > self.mlx_res.width or x < 0 or y > self.mlx_res.height or y < 0) {
-            return FdfError.out_of_bonds;
-        } else {
-            self.mlx_res.data[@as(usize, @intCast(x)) + (@as(usize, @intCast(y)) * self.mlx_res.width)] = color;
-        }
+        if (x < 0 or y < 0) return FdfError.out_of_bonds;
+        if (x > self.mlx_res.width or y > self.mlx_res.height) return FdfError.out_of_bonds;
+        self.mlx_res.data[@as(usize, @intCast(x)) + (@as(usize, @intCast(y)) * self.mlx_res.width)] = color;
     }
 
     fn switchMap(self: *Self) void {
